@@ -1,6 +1,6 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "@/shared/constants/providers";
-import { getProviderConnections, getCombos, getModelAliases } from "@/lib/localDb";
+import { getProviderConnections, getCombos, getModelAliases, getCustomModels } from "@/lib/localDb";
 
 const parseOpenAIStyleModels = (data) => {
   if (Array.isArray(data)) return data;
@@ -113,6 +113,14 @@ export async function GET() {
       console.log("Could not fetch model aliases");
     }
 
+    // Get custom models added via "+ Add Model" button
+    let customModels = [];
+    try {
+      customModels = await getCustomModels();
+    } catch (e) {
+      console.log("Could not fetch custom models");
+    }
+
     // Build first active connection per provider (connections already sorted by priority)
     const activeConnectionByProvider = new Map();
     for (const conn of connections) {
@@ -184,18 +192,32 @@ export async function GET() {
 
         // Merge in custom models added via "+ Add Model" button.
         // These are stored as model aliases where alias === modelId and fullModel === `${staticAlias}/${modelId}`.
-        if (!hasExplicitEnabledModels) {
-          const aliasPrefix = `${staticAlias}/`;
-          const hardcodedIds = new Set(rawModelIds);
-          const aliasModelIds = Object.entries(modelAliases)
-            .filter(([aliasName, fullModel]) =>
-              fullModel.startsWith(aliasPrefix) &&
-              aliasName === fullModel.slice(aliasPrefix.length)
-            )
-            .map(([, fullModel]) => fullModel.slice(aliasPrefix.length))
-            .filter((modelId) => !hardcodedIds.has(modelId));
-          if (aliasModelIds.length > 0) {
-            rawModelIds = [...rawModelIds, ...aliasModelIds];
+        {
+          const currentIds = new Set(rawModelIds);
+
+          if (!hasExplicitEnabledModels) {
+            // Merge from modelAliases (legacy path)
+            const aliasPrefix = `${staticAlias}/`;
+            const aliasModelIds = Object.entries(modelAliases)
+              .filter(([aliasName, fullModel]) =>
+                fullModel.startsWith(aliasPrefix) &&
+                aliasName === fullModel.slice(aliasPrefix.length)
+              )
+              .map(([, fullModel]) => fullModel.slice(aliasPrefix.length))
+              .filter((modelId) => !currentIds.has(modelId));
+            if (aliasModelIds.length > 0) {
+              rawModelIds = [...rawModelIds, ...aliasModelIds];
+              aliasModelIds.forEach((id) => currentIds.add(id));
+            }
+          }
+
+          // Always merge from customModels array (stored via /api/models/custom)
+          const customModelIds = customModels
+            .filter((m) => m.providerAlias === outputAlias || m.providerAlias === staticAlias)
+            .map((m) => m.id)
+            .filter((modelId) => !currentIds.has(modelId));
+          if (customModelIds.length > 0) {
+            rawModelIds = [...rawModelIds, ...customModelIds];
           }
         }
 
