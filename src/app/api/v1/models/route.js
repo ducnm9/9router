@@ -1,6 +1,6 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "@/shared/constants/providers";
-import { getProviderConnections, getCombos } from "@/lib/localDb";
+import { getProviderConnections, getCombos, getModelAliases } from "@/lib/localDb";
 
 const parseOpenAIStyleModels = (data) => {
   if (Array.isArray(data)) return data;
@@ -105,6 +105,14 @@ export async function GET() {
       console.log("Could not fetch combos");
     }
 
+    // Get model aliases (includes custom models added via "+ Add Model" button)
+    let modelAliases = {};
+    try {
+      modelAliases = await getModelAliases();
+    } catch (e) {
+      console.log("Could not fetch model aliases");
+    }
+
     // Build first active connection per provider (connections already sorted by priority)
     const activeConnectionByProvider = new Map();
     for (const conn of connections) {
@@ -173,6 +181,23 @@ export async function GET() {
               ),
             )
           : providerModels.map((model) => model.id);
+
+        // Merge in custom models added via "+ Add Model" button.
+        // These are stored as model aliases where alias === modelId and fullModel === `${staticAlias}/${modelId}`.
+        if (!hasExplicitEnabledModels) {
+          const aliasPrefix = `${staticAlias}/`;
+          const hardcodedIds = new Set(rawModelIds);
+          const aliasModelIds = Object.entries(modelAliases)
+            .filter(([aliasName, fullModel]) =>
+              fullModel.startsWith(aliasPrefix) &&
+              aliasName === fullModel.slice(aliasPrefix.length)
+            )
+            .map(([, fullModel]) => fullModel.slice(aliasPrefix.length))
+            .filter((modelId) => !hardcodedIds.has(modelId));
+          if (aliasModelIds.length > 0) {
+            rawModelIds = [...rawModelIds, ...aliasModelIds];
+          }
+        }
 
         if (isCompatibleProvider && rawModelIds.length === 0 && !UPSTREAM_CONNECTION_RE.test(providerId)) {
           rawModelIds = await fetchCompatibleModelIds(conn);

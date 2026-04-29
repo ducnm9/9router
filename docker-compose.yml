@@ -1,0 +1,19 @@
+services:
+  9router:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: 9router
+    restart: unless-stopped
+    ports:
+      - "20128:20128"
+    volumes:
+      - 9router_data:/app/data
+    environment:
+      - DATA_DIR=/app/data
+    env_file:
+      - .env
+
+volumes:
+  9router_data:
+    driver: local
