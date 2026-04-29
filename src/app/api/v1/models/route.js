@@ -203,7 +203,7 @@ export async function GET() {
           || getProviderAlias(providerId)
           || staticAlias
         ).trim();
-        const providerModels = PROVIDER_MODELS[staticAlias] || [];
+        const providerModels = PROVIDER_MODELS[staticAlias] || PROVIDER_MODELS[providerId] || [];
         const enabledModels = conn?.providerSpecificData?.enabledModels;
         const hasExplicitEnabledModels =
           Array.isArray(enabledModels) && enabledModels.length > 0;
@@ -229,7 +229,7 @@ export async function GET() {
           const currentIds = new Set(rawModelIds);
 
           if (!hasExplicitEnabledModels) {
-            // Merge from modelAliases (legacy path)
+            // Merge from modelAliases (legacy path) — only when no explicit selection
             const aliasPrefix = `${staticAlias}/`;
             const aliasModelIds = Object.entries(modelAliases)
               .filter(([aliasName, fullModel]) =>
@@ -237,6 +237,28 @@ export async function GET() {
                 aliasName === fullModel.slice(aliasPrefix.length)
               )
               .map(([, fullModel]) => fullModel.slice(aliasPrefix.length))
+              .filter((modelId) => !currentIds.has(modelId));
+            if (aliasModelIds.length > 0) {
+              rawModelIds = [...rawModelIds, ...aliasModelIds];
+              aliasModelIds.forEach((id) => currentIds.add(id));
+            }
+          } else {
+            // Even with explicit enabledModels, still merge user-added custom models from aliases
+            // UI stores them as: { "v4-pro": "deepseek/v4-pro" } or { "v4-pro": "ds/v4-pro" }
+            const aliasPrefixes = [`${staticAlias}/`, `${outputAlias}/`, `${providerId}/`];
+            const aliasModelIds = Object.entries(modelAliases)
+              .filter(([aliasName, fullModel]) =>
+                aliasPrefixes.some((prefix) =>
+                  fullModel.startsWith(prefix) &&
+                  aliasName === fullModel.slice(prefix.length)
+                )
+              )
+              .map(([, fullModel]) => {
+                for (const prefix of aliasPrefixes) {
+                  if (fullModel.startsWith(prefix)) return fullModel.slice(prefix.length);
+                }
+                return fullModel;
+              })
               .filter((modelId) => !currentIds.has(modelId));
             if (aliasModelIds.length > 0) {
               rawModelIds = [...rawModelIds, ...aliasModelIds];

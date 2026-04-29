@@ -568,6 +568,8 @@ const OAUTH_ALIASES = {
   opencode: "oc",
   vertex: "vertex",
   "vertex-partner": "vertex-partner",
+  // API-key providers with short aliases
+  deepseek: "ds",
 };
 
 // Derived from PROVIDERS — no need to maintain manually
