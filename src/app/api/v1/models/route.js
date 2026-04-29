@@ -162,6 +162,39 @@ export async function GET() {
           });
         }
       }
+
+      // Also include custom models and modelAliases even when no connections
+      const addedIds = new Set(models.map((m) => m.id));
+      for (const cm of customModels) {
+        const fullId = `${cm.providerAlias}/${cm.id}`;
+        if (!addedIds.has(fullId)) {
+          models.push({
+            id: fullId,
+            object: "model",
+            created: timestamp,
+            owned_by: cm.providerAlias,
+            permission: [],
+            root: cm.id,
+            parent: null,
+          });
+          addedIds.add(fullId);
+        }
+      }
+      for (const [, fullModel] of Object.entries(modelAliases)) {
+        if (!addedIds.has(fullModel) && fullModel.includes("/")) {
+          const prefix = fullModel.split("/")[0];
+          models.push({
+            id: fullModel,
+            object: "model",
+            created: timestamp,
+            owned_by: prefix,
+            permission: [],
+            root: fullModel.split("/").slice(1).join("/"),
+            parent: null,
+          });
+          addedIds.add(fullModel);
+        }
+      }
     } else {
       for (const [providerId, conn] of activeConnectionByProvider.entries()) {
         const staticAlias = PROVIDER_ID_TO_ALIAS[providerId] || providerId;
@@ -250,6 +283,56 @@ export async function GET() {
             root: modelId,
             parent: null,
           });
+        }
+      }
+
+      // Also include custom models for providers that have NO active connection
+      // (e.g. user added a custom model to DeepSeek but hasn't added an API key yet)
+      const connectedAliases = new Set(
+        [...activeConnectionByProvider.entries()].flatMap(([providerId, conn]) => {
+          const staticAlias = PROVIDER_ID_TO_ALIAS[providerId] || providerId;
+          const outputAlias = (
+            conn?.providerSpecificData?.prefix
+            || getProviderAlias(providerId)
+            || staticAlias
+          ).trim();
+          return [staticAlias, outputAlias, providerId];
+        })
+      );
+
+      for (const cm of customModels) {
+        if (!connectedAliases.has(cm.providerAlias)) {
+          models.push({
+            id: `${cm.providerAlias}/${cm.id}`,
+            object: "model",
+            created: timestamp,
+            owned_by: cm.providerAlias,
+            permission: [],
+            root: cm.id,
+            parent: null,
+          });
+        }
+      }
+
+      // Also include modelAliases for providers not in any active connection
+      // e.g. { "v4-pro": "deepseek/v4-pro" } when deepseek has no connection
+      const addedModelIds = new Set(models.map((m) => m.id));
+      for (const [aliasName, fullModel] of Object.entries(modelAliases)) {
+        if (!addedModelIds.has(fullModel) && !addedModelIds.has(aliasName)) {
+          // Check if this fullModel belongs to a connected provider
+          const prefix = fullModel.includes("/") ? fullModel.split("/")[0] : null;
+          if (prefix && !connectedAliases.has(prefix)) {
+            models.push({
+              id: fullModel,
+              object: "model",
+              created: timestamp,
+              owned_by: prefix,
+              permission: [],
+              root: fullModel.split("/").slice(1).join("/"),
+              parent: null,
+            });
+            addedModelIds.add(fullModel);
+          }
         }
       }
     }
