@@ -18,10 +18,18 @@ export class GithubExecutor extends BaseExecutor {
   /**
    * Resolve GitHub URLs based on enterprise subdomain stored in credentials.
    * Falls back to standard GitHub.com URLs if no enterprise subdomain is set.
+   * If copilotChatEndpoint is stored (from token response), use it directly.
    */
   getGitHubUrls(credentials) {
     const sub = credentials?.providerSpecificData?.enterpriseSubdomain;
-    return buildGitHubUrls(sub);
+    const urls = buildGitHubUrls(sub);
+    // Override chat URL with endpoint from copilot token response if available
+    const chatEndpoint = credentials?.providerSpecificData?.copilotChatEndpoint;
+    if (chatEndpoint) {
+      urls.copilotChatUrl = chatEndpoint.replace(/\/$/, "") + "/chat/completions";
+      urls.copilotResponsesUrl = chatEndpoint.replace(/\/$/, "") + "/responses";
+    }
+    return urls;
   }
 
   buildUrl(model, stream, urlIndex = 0, credentials = null) {
@@ -318,8 +326,9 @@ export class GithubExecutor extends BaseExecutor {
         log?.error?.("TOKEN", `Copilot token refresh returned empty token: ${JSON.stringify(data)}`);
         return null;
       }
-      log?.info?.("TOKEN", "Copilot token refreshed");
-      return { token: data.token, expiresAt: data.expires_at };
+      // Log full response to help debug endpoint issues (token truncated for security)
+      log?.info?.("TOKEN", `Copilot token refreshed | endpoints=${JSON.stringify(data.endpoints?.api || data.endpoints || "none")} | token_prefix=${data.token?.substring(0, 10)}...`);
+      return { token: data.token, expiresAt: data.expires_at, endpoints: data.endpoints };
     } catch (error) {
       log?.error?.("TOKEN", `Copilot refresh error: ${error.message}`);
       return null;
@@ -361,15 +370,17 @@ export class GithubExecutor extends BaseExecutor {
       if (githubTokens?.accessToken) {
         copilotResult = await this.refreshCopilotToken(githubTokens.accessToken, log, proxyOptions, credentials);
         if (copilotResult) {
+          // Extract chat endpoint from copilot token response (e.g. "https://api.enterprise.githubcopilot.com")
+          const chatEndpoint = copilotResult.endpoints?.api || credentials?.providerSpecificData?.copilotChatEndpoint || "";
           return {
             ...githubTokens,
             copilotToken: copilotResult.token,
             copilotTokenExpiresAt: copilotResult.expiresAt,
-            // Merge into providerSpecificData so onCredentialsRefreshed saves it to DB correctly
             providerSpecificData: {
               ...(credentials.providerSpecificData || {}),
               copilotToken: copilotResult.token,
               copilotTokenExpiresAt: copilotResult.expiresAt,
+              ...(chatEndpoint ? { copilotChatEndpoint: chatEndpoint } : {}),
             },
           };
         }
@@ -378,16 +389,17 @@ export class GithubExecutor extends BaseExecutor {
     }
 
     if (copilotResult) {
+      const chatEndpoint = copilotResult.endpoints?.api || credentials?.providerSpecificData?.copilotChatEndpoint || "";
       return {
         accessToken: credentials.accessToken,
         refreshToken: credentials.refreshToken,
         copilotToken: copilotResult.token,
         copilotTokenExpiresAt: copilotResult.expiresAt,
-        // Merge into providerSpecificData so onCredentialsRefreshed saves it to DB correctly
         providerSpecificData: {
           ...(credentials.providerSpecificData || {}),
           copilotToken: copilotResult.token,
           copilotTokenExpiresAt: copilotResult.expiresAt,
+          ...(chatEndpoint ? { copilotChatEndpoint: chatEndpoint } : {}),
         },
       };
     }

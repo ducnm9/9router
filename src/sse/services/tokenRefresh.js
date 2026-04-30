@@ -263,10 +263,13 @@ export async function checkAndRefreshToken(provider, credentials) {
 
       const copilotToken = await refreshCopilotToken(creds.accessToken, null, creds.providerSpecificData?.enterpriseSubdomain);
       if (copilotToken) {
+        // Extract chat endpoint from copilot token response (e.g. "https://api.enterprise.githubcopilot.com")
+        const chatEndpoint = copilotToken.endpoints?.api || creds.providerSpecificData?.copilotChatEndpoint || "";
         const updatedSpecific = {
           ...creds.providerSpecificData,
           copilotToken:          copilotToken.token,
           copilotTokenExpiresAt: copilotToken.expiresAt,
+          ...(chatEndpoint ? { copilotChatEndpoint: chatEndpoint } : {}),
         };
 
         await updateProviderCredentials(creds.connectionId, {

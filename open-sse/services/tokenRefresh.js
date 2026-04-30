@@ -435,10 +435,12 @@ export async function refreshGitHubToken(refreshToken, log, enterpriseSubdomain)
 export async function refreshCopilotToken(githubAccessToken, log, enterpriseSubdomain) {
   const { buildGitHubUrls } = await import("../config/appConstants.js");
   const urls = buildGitHubUrls(enterpriseSubdomain);
+  // GHE.com uses Bearer scheme; GitHub.com accepts both "token" and "Bearer"
+  const authScheme = enterpriseSubdomain ? "Bearer" : "token";
   try {
     const response = await fetch(urls.copilotTokenUrl, {
       headers: {
-        "Authorization": `token ${githubAccessToken}`,
+        "Authorization": `${authScheme} ${githubAccessToken}`,
         "User-Agent": GITHUB_COPILOT.USER_AGENT,
         "Editor-Version": `vscode/${GITHUB_COPILOT.VSCODE_VERSION}`,
         "Editor-Plugin-Version": `copilot-chat/${GITHUB_COPILOT.COPILOT_CHAT_VERSION}`,
@@ -460,12 +462,14 @@ export async function refreshCopilotToken(githubAccessToken, log, enterpriseSubd
 
     log?.info?.("TOKEN_REFRESH", "Successfully refreshed Copilot token", {
       hasToken: !!data.token,
-      expiresAt: data.expires_at
+      expiresAt: data.expires_at,
+      endpoints: data.endpoints?.api || "default"
     });
 
     return {
       token: data.token,
-      expiresAt: data.expires_at
+      expiresAt: data.expires_at,
+      endpoints: data.endpoints
     };
   } catch (error) {
     log?.error?.("TOKEN_REFRESH", "Error refreshing Copilot token", {
