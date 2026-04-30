@@ -191,7 +191,6 @@ export class GithubExecutor extends BaseExecutor {
     log?.debug?.("GITHUB", `Auth: ${usingCopilotToken ? "copilotToken" : "accessToken (no copilotToken)"} | copilotTokenExpiresAt=${credentials?.providerSpecificData?.copilotTokenExpiresAt || credentials?.copilotTokenExpiresAt || "none"} | url=${urls.copilotChatUrl}`);
 
     // Override URL to use enterprise domain if configured
-    const urls = this.getGitHubUrls(credentials);
     const result = await super.execute({
       ...sanitizedOptions,
       overrideUrl: urls.copilotChatUrl,
