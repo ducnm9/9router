@@ -72,6 +72,13 @@ const getPageInfo = (pathname) => {
       icon: "dns",
       breadcrumbs: [],
     };
+  if (pathname.includes("/model-visibility"))
+    return {
+      title: "Model Visibility",
+      description: "Choose which models appear in /v1/models API response",
+      icon: "visibility",
+      breadcrumbs: [],
+    };
   if (pathname.includes("/combos"))
     return {
       title: "Combos",

@@ -51,6 +51,7 @@ function cloneDefaultData() {
     apiKeys: [],
     settings: { ...DEFAULT_SETTINGS },
     pricing: {},
+    hiddenModels: [],
   };
 }
 
@@ -850,4 +851,17 @@ export async function resetAllPricing() {
   db.data.pricing = {};
   await safeWrite(db);
   return db.data.pricing;
+}
+
+// Hidden models — models excluded from /v1/models response
+export async function getHiddenModels() {
+  const db = await getDb();
+  return db.data.hiddenModels || [];
+}
+
+export async function setHiddenModels(hiddenModels) {
+  const db = await getDb();
+  db.data.hiddenModels = Array.isArray(hiddenModels) ? hiddenModels : [];
+  await safeWrite(db);
+  return db.data.hiddenModels;
 }

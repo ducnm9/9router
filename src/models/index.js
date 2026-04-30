@@ -35,4 +35,6 @@ export {
   deleteApiKey,
   validateApiKey,
   isCloudEnabled,
+  getHiddenModels,
+  setHiddenModels,
 } from "@/lib/localDb";

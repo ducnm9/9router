@@ -1,6 +1,6 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "@/shared/constants/providers";
-import { getProviderConnections, getCombos, getModelAliases, getCustomModels } from "@/lib/localDb";
+import { getProviderConnections, getCombos, getModelAliases, getCustomModels, getHiddenModels } from "@/lib/localDb";
 
 const parseOpenAIStyleModels = (data) => {
   if (Array.isArray(data)) return data;
@@ -120,6 +120,15 @@ export async function GET() {
     } catch (e) {
       console.log("Could not fetch custom models");
     }
+
+    // Get hidden models list
+    let hiddenModels = [];
+    try {
+      hiddenModels = await getHiddenModels();
+    } catch (e) {
+      console.log("Could not fetch hidden models");
+    }
+    const hiddenSet = new Set(hiddenModels);
 
     // Build first active connection per provider (connections already sorted by priority)
     const activeConnectionByProvider = new Map();
@@ -359,9 +368,14 @@ export async function GET() {
       }
     }
 
+    // Filter out hidden models
+    const visibleModels = hiddenSet.size > 0
+      ? models.filter(m => !hiddenSet.has(m.id))
+      : models;
+
     return Response.json({
       object: "list",
-      data: models,
+      data: visibleModels,
     }, {
       headers: {
         "Access-Control-Allow-Origin": "*",
