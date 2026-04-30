@@ -148,9 +148,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         setStep("waiting");
 
         // Use the override value passed directly from the button click (avoids stale closure)
-        const resolvedSubdomain = enterpriseSubdomainOverride !== undefined
-          ? enterpriseSubdomainOverride
-          : gheSubdomain;
+        const resolvedSubdomain = enterpriseSubdomainOverride || "";
 
         const deviceCodeUrl = new URL(`/api/oauth/${provider}/device-code`, window.location.origin);
         if (provider === "kiro" && idcConfig?.startUrl) {
@@ -242,7 +240,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
       setError(err.message);
       setStep("error");
     }
-  }, [provider, isLocalhost, startPolling, oauthMeta, idcConfig, gheSubdomain]);
+  }, [provider, isLocalhost, startPolling, oauthMeta, idcConfig]);
 
   // Reset state and start OAuth when modal opens
   useEffect(() => {
