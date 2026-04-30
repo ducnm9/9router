@@ -350,14 +350,35 @@ export class GithubExecutor extends BaseExecutor {
       if (githubTokens?.accessToken) {
         copilotResult = await this.refreshCopilotToken(githubTokens.accessToken, log, proxyOptions, credentials);
         if (copilotResult) {
-          return { ...githubTokens, copilotToken: copilotResult.token, copilotTokenExpiresAt: copilotResult.expiresAt };
+          return {
+            ...githubTokens,
+            copilotToken: copilotResult.token,
+            copilotTokenExpiresAt: copilotResult.expiresAt,
+            // Merge into providerSpecificData so onCredentialsRefreshed saves it to DB correctly
+            providerSpecificData: {
+              ...(credentials.providerSpecificData || {}),
+              copilotToken: copilotResult.token,
+              copilotTokenExpiresAt: copilotResult.expiresAt,
+            },
+          };
         }
         return githubTokens;
       }
     }
 
     if (copilotResult) {
-      return { accessToken: credentials.accessToken, refreshToken: credentials.refreshToken, copilotToken: copilotResult.token, copilotTokenExpiresAt: copilotResult.expiresAt };
+      return {
+        accessToken: credentials.accessToken,
+        refreshToken: credentials.refreshToken,
+        copilotToken: copilotResult.token,
+        copilotTokenExpiresAt: copilotResult.expiresAt,
+        // Merge into providerSpecificData so onCredentialsRefreshed saves it to DB correctly
+        providerSpecificData: {
+          ...(credentials.providerSpecificData || {}),
+          copilotToken: copilotResult.token,
+          copilotTokenExpiresAt: copilotResult.expiresAt,
+        },
+      };
     }
 
     return null;

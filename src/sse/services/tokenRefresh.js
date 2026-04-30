@@ -245,7 +245,7 @@ export async function checkAndRefreshToken(provider, credentials) {
         expiresIn: Math.round(remaining / 1000),
       });
 
-      const copilotToken = await refreshCopilotToken(creds.accessToken);
+      const copilotToken = await refreshCopilotToken(creds.accessToken, null, creds.providerSpecificData?.enterpriseSubdomain);
       if (copilotToken) {
         const updatedSpecific = {
           ...creds.providerSpecificData,
