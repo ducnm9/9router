@@ -1,6 +1,6 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
 import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider, FREE_PROVIDERS, APIKEY_PROVIDERS } from "@/shared/constants/providers";
-import { getProviderConnections, getCombos, getModelAliases, getCustomModels, getHiddenModels } from "@/lib/localDb";
+import { getProviderConnections, getCombos, getModelAliases, getCustomModels, getHiddenModels, getSettings, validateApiKey } from "@/lib/localDb";
 
 const parseOpenAIStyleModels = (data) => {
   if (Array.isArray(data)) return data;
@@ -96,6 +96,17 @@ async function fetchModelsFetcherIds(fetcher) {
 }
 
 /**
+ * Extract API key from request headers (Bearer token or x-api-key).
+ */
+function extractApiKey(request) {
+  const authHeader = request.headers.get("Authorization");
+  if (authHeader?.startsWith("Bearer ")) return authHeader.slice(7);
+  const xApiKey = request.headers.get("x-api-key");
+  if (xApiKey) return xApiKey;
+  return null;
+}
+
+/**
  * Handle CORS preflight
  */
 export async function OPTIONS() {
@@ -112,8 +123,27 @@ export async function OPTIONS() {
  * GET /v1/models - OpenAI compatible models list
  * Returns models from all active providers and combos in OpenAI format
  */
-export async function GET() {
+export async function GET(request) {
   try {
+    // Enforce API key if enabled in settings
+    const settings = await getSettings();
+    if (settings.requireApiKey) {
+      const apiKey = extractApiKey(request);
+      if (!apiKey) {
+        return Response.json(
+          { error: { message: "Missing API key", type: "auth_error" } },
+          { status: 401, headers: { "Access-Control-Allow-Origin": "*" } }
+        );
+      }
+      const valid = await validateApiKey(apiKey);
+      if (!valid) {
+        return Response.json(
+          { error: { message: "Invalid API key", type: "auth_error" } },
+          { status: 401, headers: { "Access-Control-Allow-Origin": "*" } }
+        );
+      }
+    }
+
     // Get active provider connections
     let connections = [];
     try {
