@@ -20,7 +20,6 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
   const [polling, setPolling] = useState(false);
   // GitHub Enterprise: subdomain input (e.g. "mycompany" for mycompany.ghe.com)
   const [gheSubdomain, setGheSubdomain] = useState("");
-  const [gheSubdomainConfirmed, setGheSubdomainConfirmed] = useState(false);
   const popupRef = useRef(null);
   const pollingAbortRef = useRef(false);
   const { copied, copy } = useCopyToClipboard();
@@ -130,7 +129,8 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
   }, [provider, onSuccess]);
 
   // Start OAuth flow
-  const startOAuthFlow = useCallback(async () => {
+  // enterpriseSubdomainOverride: passed directly from Continue button to avoid stale closure
+  const startOAuthFlow = useCallback(async (enterpriseSubdomainOverride) => {
     if (!provider) return;
     try {
       setError(null);
@@ -138,14 +138,19 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
       // Device code flow providers
       const deviceCodeProviders = ["github", "qwen", "kiro", "kimi-coding", "kilocode", "codebuddy"];
       if (deviceCodeProviders.includes(provider)) {
-        // GitHub Enterprise: require subdomain confirmation before starting flow
-        if (provider === "github" && !gheSubdomainConfirmed) {
+        // GitHub Enterprise: show subdomain input step first (only when called without override)
+        if (provider === "github" && enterpriseSubdomainOverride === undefined) {
           setStep("ghe-input");
           return;
         }
 
         setIsDeviceCode(true);
         setStep("waiting");
+
+        // Use the override value passed directly from the button click (avoids stale closure)
+        const resolvedSubdomain = enterpriseSubdomainOverride !== undefined
+          ? enterpriseSubdomainOverride
+          : gheSubdomain;
 
         const deviceCodeUrl = new URL(`/api/oauth/${provider}/device-code`, window.location.origin);
         if (provider === "kiro" && idcConfig?.startUrl) {
@@ -156,8 +161,8 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
           deviceCodeUrl.searchParams.set("auth_method", "idc");
         }
         // Pass enterprise subdomain for GHE.com
-        if (provider === "github" && gheSubdomain.trim()) {
-          deviceCodeUrl.searchParams.set("enterprise_subdomain", gheSubdomain.trim());
+        if (provider === "github" && resolvedSubdomain.trim()) {
+          deviceCodeUrl.searchParams.set("enterprise_subdomain", resolvedSubdomain.trim());
         }
         const res = await fetch(deviceCodeUrl.toString());
         const data = await res.json();
@@ -176,7 +181,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
               _startUrl: data._startUrl,
             }
           : provider === "github"
-          ? { _enterpriseSubdomain: data._enterpriseSubdomain || gheSubdomain.trim() }
+          ? { _enterpriseSubdomain: data._enterpriseSubdomain || resolvedSubdomain.trim() }
           : null;
         startPolling(data.device_code, data.codeVerifier, data.interval || 5, extraData);
         return;
@@ -237,7 +242,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
       setError(err.message);
       setStep("error");
     }
-  }, [provider, isLocalhost, startPolling, oauthMeta, idcConfig]);
+  }, [provider, isLocalhost, startPolling, oauthMeta, idcConfig, gheSubdomain]);
 
   // Reset state and start OAuth when modal opens
   useEffect(() => {
@@ -252,7 +257,6 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
       // Reset GHE state when modal reopens
       if (provider === "github") {
         setGheSubdomain("");
-        setGheSubdomainConfirmed(false);
         setStep("ghe-input");
       } else {
         startOAuthFlow();
@@ -410,8 +414,8 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
               <Button
                 fullWidth
                 onClick={() => {
-                  setGheSubdomainConfirmed(true);
-                  startOAuthFlow();
+                  // Pass gheSubdomain directly as argument to avoid stale closure
+                  startOAuthFlow(gheSubdomain.trim());
                 }}
               >
                 Continue
