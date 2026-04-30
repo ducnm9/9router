@@ -1,5 +1,5 @@
 import { PROVIDER_MODELS, PROVIDER_ID_TO_ALIAS } from "@/shared/constants/models";
-import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider } from "@/shared/constants/providers";
+import { getProviderAlias, isAnthropicCompatibleProvider, isOpenAICompatibleProvider, FREE_PROVIDERS, APIKEY_PROVIDERS } from "@/shared/constants/providers";
 import { getProviderConnections, getCombos, getModelAliases, getCustomModels, getHiddenModels } from "@/lib/localDb";
 
 const parseOpenAIStyleModels = (data) => {
@@ -62,6 +62,34 @@ async function fetchCompatibleModelIds(connection) {
           .filter((modelId) => typeof modelId === "string" && modelId.trim() !== "")
       )
     );
+  } catch {
+    return [];
+  }
+}
+
+// Filters for modelsFetcher types (passthrough/noAuth providers like OpenCode)
+const MODELS_FETCHER_FILTERS = {
+  "openrouter-free": (models) =>
+    models
+      .filter((m) => m.pricing?.prompt === "0" && m.pricing?.completion === "0" && m.context_length >= 200000)
+      .map((m) => m.id),
+  "opencode-free": (models) =>
+    models.filter((m) => m.id?.endsWith("-free")).map((m) => m.id),
+};
+
+async function fetchModelsFetcherIds(fetcher) {
+  if (!fetcher?.url || !fetcher?.type) return [];
+  const filter = MODELS_FETCHER_FILTERS[fetcher.type];
+  if (!filter) return [];
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const res = await fetch(fetcher.url, { cache: "no-store", signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (!res.ok) return [];
+    const json = await res.json();
+    const raw = json.data ?? json.models ?? json;
+    return filter(Array.isArray(raw) ? raw : []);
   } catch {
     return [];
   }
@@ -365,6 +393,46 @@ export async function GET() {
             addedModelIds.add(fullModel);
           }
         }
+      }
+    }
+
+    // Add models from FREE_PROVIDERS / APIKEY_PROVIDERS with modelsFetcher
+    // (passthrough/noAuth providers like OpenCode that don't create connections)
+    {
+      const addedModelIds = new Set(models.map((m) => m.id));
+      const connectedProviderIds = new Set(activeConnectionByProvider.keys());
+      const fetcherPromises = [];
+
+      for (const providerMap of [FREE_PROVIDERS, APIKEY_PROVIDERS]) {
+        for (const [providerId, providerInfo] of Object.entries(providerMap)) {
+          if (!providerInfo.modelsFetcher) continue;
+          if (connectedProviderIds.has(providerId)) continue;
+          const alias = providerInfo.alias || providerId;
+
+          fetcherPromises.push(
+            fetchModelsFetcherIds(providerInfo.modelsFetcher).then((modelIds) => {
+              for (const modelId of modelIds) {
+                const fullId = `${alias}/${modelId}`;
+                if (!addedModelIds.has(fullId)) {
+                  addedModelIds.add(fullId);
+                  models.push({
+                    id: fullId,
+                    object: "model",
+                    created: timestamp,
+                    owned_by: alias,
+                    permission: [],
+                    root: modelId,
+                    parent: null,
+                  });
+                }
+              }
+            })
+          );
+        }
+      }
+
+      if (fetcherPromises.length > 0) {
+        await Promise.all(fetcherPromises);
       }
     }
 
