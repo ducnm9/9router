@@ -234,15 +234,31 @@ export async function checkAndRefreshToken(provider, credentials) {
   }
 
   // ── 2. GitHub Copilot token expiry ────────────────────────────────────────
-  if (provider === "github" && creds.providerSpecificData?.copilotTokenExpiresAt) {
-    const copilotExpiresAt = creds.providerSpecificData.copilotTokenExpiresAt * 1000;
-    const now              = Date.now();
-    const remaining        = copilotExpiresAt - now;
+  if (provider === "github") {
+    const existingCopilotToken = creds.providerSpecificData?.copilotToken || creds.copilotToken;
+    const rawExpiresAt = creds.providerSpecificData?.copilotTokenExpiresAt;
 
-    if (remaining < TOKEN_EXPIRY_BUFFER_MS) {
-      log.info("TOKEN_REFRESH", "Copilot token expiring soon, refreshing proactively", {
+    // Parse expiry — handle both Unix timestamp (seconds) and ISO string
+    let copilotExpiresAt = 0;
+    if (rawExpiresAt) {
+      if (typeof rawExpiresAt === "number") {
+        // Unix seconds if < 1e12, else already ms
+        copilotExpiresAt = rawExpiresAt < 1e12 ? rawExpiresAt * 1000 : rawExpiresAt;
+      } else if (typeof rawExpiresAt === "string") {
+        copilotExpiresAt = new Date(rawExpiresAt).getTime() || 0;
+      }
+    }
+
+    const now = Date.now();
+    const remaining = copilotExpiresAt - now;
+    const needsCopilotRefresh = !existingCopilotToken || remaining < TOKEN_EXPIRY_BUFFER_MS;
+
+    if (needsCopilotRefresh) {
+      log.info("TOKEN_REFRESH", existingCopilotToken
+        ? "Copilot token expiring soon, refreshing proactively"
+        : "No copilot token found, fetching proactively", {
         provider,
-        expiresIn: Math.round(remaining / 1000),
+        expiresIn: existingCopilotToken ? Math.round(remaining / 1000) : "N/A",
       });
 
       const copilotToken = await refreshCopilotToken(creds.accessToken, null, creds.providerSpecificData?.enterpriseSubdomain);

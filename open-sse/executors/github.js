@@ -185,6 +185,10 @@ export class GithubExecutor extends BaseExecutor {
       body: this.sanitizeMessagesForChatCompletions(options.body)
     };
 
+    // Log which token type is being used to help diagnose 401s
+    const usingCopilotToken = !!credentials?.copilotToken;
+    log?.debug?.("GITHUB", `Auth: ${usingCopilotToken ? "copilotToken" : "accessToken (no copilotToken)"} | copilotTokenExpiresAt=${credentials?.providerSpecificData?.copilotTokenExpiresAt || credentials?.copilotTokenExpiresAt || "none"}`);
+
     // Override URL to use enterprise domain if configured
     const urls = this.getGitHubUrls(credentials);
     const result = await super.execute({
