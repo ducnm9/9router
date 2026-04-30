@@ -187,7 +187,8 @@ export class GithubExecutor extends BaseExecutor {
 
     // Log which token type is being used to help diagnose 401s
     const usingCopilotToken = !!credentials?.copilotToken;
-    log?.debug?.("GITHUB", `Auth: ${usingCopilotToken ? "copilotToken" : "accessToken (no copilotToken)"} | copilotTokenExpiresAt=${credentials?.providerSpecificData?.copilotTokenExpiresAt || credentials?.copilotTokenExpiresAt || "none"}`);
+    const urls = this.getGitHubUrls(credentials);
+    log?.debug?.("GITHUB", `Auth: ${usingCopilotToken ? "copilotToken" : "accessToken (no copilotToken)"} | copilotTokenExpiresAt=${credentials?.providerSpecificData?.copilotTokenExpiresAt || credentials?.copilotTokenExpiresAt || "none"} | url=${urls.copilotChatUrl}`);
 
     // Override URL to use enterprise domain if configured
     const urls = this.getGitHubUrls(credentials);
@@ -294,10 +295,12 @@ export class GithubExecutor extends BaseExecutor {
 
   async refreshCopilotToken(githubAccessToken, log, proxyOptions = null, credentials = null) {
     const urls = this.getGitHubUrls(credentials);
+    // GHE.com uses Bearer scheme; GitHub.com accepts both "token" and "Bearer"
+    const authScheme = credentials?.providerSpecificData?.enterpriseSubdomain ? "Bearer" : "token";
     try {
       const response = await proxyAwareFetch(urls.copilotTokenUrl, {
         headers: {
-          "Authorization": `token ${githubAccessToken}`,
+          "Authorization": `${authScheme} ${githubAccessToken}`,
           "User-Agent": GITHUB_COPILOT.USER_AGENT,
           "Editor-Version": `vscode/${GITHUB_COPILOT.VSCODE_VERSION}`,
           "Editor-Plugin-Version": `copilot-chat/${GITHUB_COPILOT.COPILOT_CHAT_VERSION}`,
@@ -311,6 +314,11 @@ export class GithubExecutor extends BaseExecutor {
         return null;
       }
       const data = await response.json();
+      // Validate token is actually present and non-empty
+      if (!data.token) {
+        log?.error?.("TOKEN", `Copilot token refresh returned empty token: ${JSON.stringify(data)}`);
+        return null;
+      }
       log?.info?.("TOKEN", "Copilot token refreshed");
       return { token: data.token, expiresAt: data.expires_at };
     } catch (error) {
