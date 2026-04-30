@@ -377,8 +377,13 @@ export async function refreshIflowToken(refreshToken, log) {
 
 /**
  * Specialized refresh for GitHub Copilot OAuth tokens
+ * @param {string} refreshToken
+ * @param {object} log
+ * @param {string} [enterpriseSubdomain] - GHE.com subdomain
  */
-export async function refreshGitHubToken(refreshToken, log) {
+export async function refreshGitHubToken(refreshToken, log, enterpriseSubdomain) {
+  const { buildGitHubUrls } = await import("../config/appConstants.js");
+  const urls = buildGitHubUrls(enterpriseSubdomain);
   const params = {
     grant_type: "refresh_token",
     refresh_token: refreshToken,
@@ -388,7 +393,7 @@ export async function refreshGitHubToken(refreshToken, log) {
     params.client_secret = PROVIDERS.github.clientSecret;
   }
 
-  const response = await fetch(OAUTH_ENDPOINTS.github.token, {
+  const response = await fetch(urls.tokenUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -423,10 +428,15 @@ export async function refreshGitHubToken(refreshToken, log) {
 
 /**
  * Refresh GitHub Copilot token using GitHub access token
+ * @param {string} githubAccessToken
+ * @param {object} log
+ * @param {string} [enterpriseSubdomain] - GHE.com subdomain, e.g. "mycompany" for mycompany.ghe.com
  */
-export async function refreshCopilotToken(githubAccessToken, log) {
+export async function refreshCopilotToken(githubAccessToken, log, enterpriseSubdomain) {
+  const { buildGitHubUrls } = await import("../config/appConstants.js");
+  const urls = buildGitHubUrls(enterpriseSubdomain);
   try {
-    const response = await fetch("https://api.github.com/copilot_internal/v2/token", {
+    const response = await fetch(urls.copilotTokenUrl, {
       headers: {
         "Authorization": `token ${githubAccessToken}`,
         "User-Agent": GITHUB_COPILOT.USER_AGENT,
@@ -498,7 +508,7 @@ export async function getAccessToken(provider, credentials, log) {
       return await refreshIflowToken(credentials.refreshToken, log);
 
     case "github":
-      return await refreshGitHubToken(credentials.refreshToken, log);
+      return await refreshGitHubToken(credentials.refreshToken, log, credentials.providerSpecificData?.enterpriseSubdomain);
 
     case "kiro":
       return await refreshKiroToken(
@@ -544,7 +554,7 @@ export async function refreshTokenByProvider(provider, credentials, log) {
     case "iflow":
       return refreshIflowToken(credentials.refreshToken, log);
     case "github":
-      return refreshGitHubToken(credentials.refreshToken, log);
+      return refreshGitHubToken(credentials.refreshToken, log, credentials.providerSpecificData?.enterpriseSubdomain);
     case "kiro":
       return refreshKiroToken(
         credentials.refreshToken,

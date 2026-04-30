@@ -61,12 +61,15 @@ export async function GET(request, { params }) {
       const startUrl = searchParams.get("start_url");
       const region = searchParams.get("region");
       const authMethod = searchParams.get("auth_method");
+      const enterpriseSubdomain = searchParams.get("enterprise_subdomain") || "";
       const deviceOptions = provider === "kiro"
         ? {
             ...(startUrl ? { startUrl } : {}),
             ...(region ? { region } : {}),
             ...(authMethod ? { authMethod } : {}),
           }
+        : provider === "github"
+        ? { enterpriseSubdomain }
         : undefined;
       
       // Providers that don't use PKCE for device code
@@ -149,7 +152,8 @@ export async function POST(request, { params }) {
       const noPkceProviders = ["github", "kimi-coding", "kilocode", "codebuddy"];
       let result;
       if (noPkceProviders.includes(provider)) {
-        result = await pollForToken(provider, deviceCode);
+        // For github, pass extraData so pollToken can use _enterpriseSubdomain
+        result = await pollForToken(provider, deviceCode, null, extraData || null);
       } else if (provider === "kiro") {
         // Kiro needs extraData (clientId, clientSecret) from device code response
         result = await pollForToken(provider, deviceCode, null, extraData);

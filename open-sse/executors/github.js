@@ -1,6 +1,6 @@
 import { BaseExecutor } from "./base.js";
 import { PROVIDERS } from "../config/providers.js";
-import { OAUTH_ENDPOINTS, GITHUB_COPILOT } from "../config/appConstants.js";
+import { OAUTH_ENDPOINTS, GITHUB_COPILOT, buildGitHubUrls } from "../config/appConstants.js";
 import { HTTP_STATUS } from "../config/runtimeConfig.js";
 import { openaiToOpenAIResponsesRequest } from "../translator/request/openai-responses.js";
 import { openaiResponsesToOpenAIResponse } from "../translator/response/openai-responses.js";
@@ -15,8 +15,18 @@ export class GithubExecutor extends BaseExecutor {
     this.knownCodexModels = new Set();
   }
 
-  buildUrl(model, stream, urlIndex = 0) {
-    return this.config.baseUrl;
+  /**
+   * Resolve GitHub URLs based on enterprise subdomain stored in credentials.
+   * Falls back to standard GitHub.com URLs if no enterprise subdomain is set.
+   */
+  getGitHubUrls(credentials) {
+    const sub = credentials?.providerSpecificData?.enterpriseSubdomain;
+    return buildGitHubUrls(sub);
+  }
+
+  buildUrl(model, stream, urlIndex = 0, credentials = null) {
+    const urls = this.getGitHubUrls(credentials);
+    return urls.copilotChatUrl;
   }
 
   buildHeaders(credentials, stream = true) {
@@ -160,7 +170,7 @@ export class GithubExecutor extends BaseExecutor {
   }
 
   async execute(options) {
-    const { model, log } = options;
+    const { model, log, credentials } = options;
 
     // Only use /responses for models that are explicitly known to need it (e.g. gpt codex models)
     if (this.knownCodexModels.has(model)) {
@@ -175,7 +185,13 @@ export class GithubExecutor extends BaseExecutor {
       body: this.sanitizeMessagesForChatCompletions(options.body)
     };
 
-    const result = await super.execute({ ...sanitizedOptions, proxyOptions: options.proxyOptions || null });
+    // Override URL to use enterprise domain if configured
+    const urls = this.getGitHubUrls(credentials);
+    const result = await super.execute({
+      ...sanitizedOptions,
+      overrideUrl: urls.copilotChatUrl,
+      proxyOptions: options.proxyOptions || null
+    });
 
     if (result.response.status === HTTP_STATUS.BAD_REQUEST) {
       const errorBody = await result.response.clone().text();
@@ -191,7 +207,8 @@ export class GithubExecutor extends BaseExecutor {
   }
 
   async executeWithResponsesEndpoint({ model, body, stream, credentials, signal, log, proxyOptions = null }) {
-    const url = this.config.responsesUrl;
+    const urls = this.getGitHubUrls(credentials);
+    const url = urls.copilotResponsesUrl;
     const headers = this.buildHeaders(credentials, stream);
 
     const transformedBody = openaiToOpenAIResponsesRequest(model, body, stream, credentials);
@@ -271,9 +288,10 @@ export class GithubExecutor extends BaseExecutor {
     };
   }
 
-  async refreshCopilotToken(githubAccessToken, log, proxyOptions = null) {
+  async refreshCopilotToken(githubAccessToken, log, proxyOptions = null, credentials = null) {
+    const urls = this.getGitHubUrls(credentials);
     try {
-      const response = await proxyAwareFetch("https://api.github.com/copilot_internal/v2/token", {
+      const response = await proxyAwareFetch(urls.copilotTokenUrl, {
         headers: {
           "Authorization": `token ${githubAccessToken}`,
           "User-Agent": GITHUB_COPILOT.USER_AGENT,
@@ -297,7 +315,8 @@ export class GithubExecutor extends BaseExecutor {
     }
   }
 
-  async refreshGitHubToken(refreshToken, log, proxyOptions = null) {
+  async refreshGitHubToken(refreshToken, log, proxyOptions = null, credentials = null) {
+    const urls = this.getGitHubUrls(credentials);
     try {
       const params = {
         grant_type: "refresh_token",
@@ -308,7 +327,7 @@ export class GithubExecutor extends BaseExecutor {
         params.client_secret = this.config.clientSecret;
       }
 
-      const response = await proxyAwareFetch(OAUTH_ENDPOINTS.github.token, {
+      const response = await proxyAwareFetch(urls.tokenUrl, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
         body: new URLSearchParams(params)
@@ -324,12 +343,12 @@ export class GithubExecutor extends BaseExecutor {
   }
 
   async refreshCredentials(credentials, log, proxyOptions = null) {
-    let copilotResult = await this.refreshCopilotToken(credentials.accessToken, log, proxyOptions);
+    let copilotResult = await this.refreshCopilotToken(credentials.accessToken, log, proxyOptions, credentials);
 
     if (!copilotResult && credentials.refreshToken) {
-      const githubTokens = await this.refreshGitHubToken(credentials.refreshToken, log, proxyOptions);
+      const githubTokens = await this.refreshGitHubToken(credentials.refreshToken, log, proxyOptions, credentials);
       if (githubTokens?.accessToken) {
-        copilotResult = await this.refreshCopilotToken(githubTokens.accessToken, log, proxyOptions);
+        copilotResult = await this.refreshCopilotToken(githubTokens.accessToken, log, proxyOptions, credentials);
         if (copilotResult) {
           return { ...githubTokens, copilotToken: copilotResult.token, copilotTokenExpiresAt: copilotResult.expiresAt };
         }

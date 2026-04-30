@@ -147,6 +147,31 @@ export const GITHUB_CONFIG = {
   editorPluginVersion: "copilot-chat/0.26.7",
 };
 
+/**
+ * Build GitHub URLs for a given enterprise subdomain (GHE.com).
+ * Pass undefined or empty string for standard GitHub.com.
+ * @param {string} [enterpriseSubdomain] - e.g. "mycompany" for mycompany.ghe.com
+ */
+export function buildGitHubConfigUrls(enterpriseSubdomain) {
+  const sub = typeof enterpriseSubdomain === "string" ? enterpriseSubdomain.trim() : "";
+  if (!sub) {
+    return {
+      deviceCodeUrl: GITHUB_CONFIG.deviceCodeUrl,
+      tokenUrl: GITHUB_CONFIG.tokenUrl,
+      userInfoUrl: GITHUB_CONFIG.userInfoUrl,
+      copilotTokenUrl: GITHUB_CONFIG.copilotTokenUrl,
+    };
+  }
+  const gheBase = `https://${sub}.ghe.com`;
+  const apiBase = `https://api.${sub}.ghe.com`;
+  return {
+    deviceCodeUrl: `${gheBase}/login/device/code`,
+    tokenUrl: `${gheBase}/login/oauth/access_token`,
+    userInfoUrl: `${apiBase}/user`,
+    copilotTokenUrl: `${apiBase}/copilot_internal/v2/token`,
+  };
+}
+
 // Kiro OAuth Configuration
 // Supports multiple auth methods:
 // 1. AWS Builder ID (Device Code Flow)

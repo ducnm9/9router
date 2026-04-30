@@ -748,6 +748,20 @@ Models:
   gh/grok-code-fast-1
 ```
 
+#### GitHub Enterprise Cloud (GHE.com)
+
+If your organization uses GitHub Enterprise Cloud (e.g. `mycompany.ghe.com`), 9Router supports it natively:
+
+```bash
+Dashboard → Providers → Connect GitHub
+→ A prompt will appear asking for your GHE.com subdomain
+→ Enter your subdomain (e.g. "mycompany" for mycompany.ghe.com)
+→ Leave blank for standard GitHub.com
+→ Complete Device Code Flow as usual
+```
+
+All API calls (auth, token refresh, Copilot chat, usage) will automatically route through your enterprise domain. The subdomain is saved with the connection and requires no further configuration.
+
 ### Cursor IDE
 
 ```bash
@@ -1111,6 +1125,8 @@ Notes:
 - `gh/claude-sonnet-4.6`
 - `gh/gemini-3.1-pro-preview`
 - `gh/grok-code-fast-1`
+
+> **GitHub Enterprise (GHE.com):** Enter your subdomain (e.g. `mycompany`) when connecting — all API calls route through `api.mycompany.ghe.com` automatically.
 
 **Cursor (`cu/`)** - Subscription:
 - `cu/claude-4.6-opus-max`

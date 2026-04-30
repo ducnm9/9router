@@ -609,8 +609,10 @@ const PROVIDERS = {
   github: {
     config: GITHUB_CONFIG,
     flowType: "device_code",
-    requestDeviceCode: async (config) => {
-      const response = await fetch(config.deviceCodeUrl, {
+    requestDeviceCode: async (config, codeChallenge, options = {}) => {
+      const { buildGitHubConfigUrls } = await import("./constants/oauth.js");
+      const urls = buildGitHubConfigUrls(options.enterpriseSubdomain);
+      const response = await fetch(urls.deviceCodeUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -627,10 +629,14 @@ const PROVIDERS = {
         throw new Error(`Device code request failed: ${error}`);
       }
 
-      return await response.json();
+      const data = await response.json();
+      // Carry enterpriseSubdomain through so pollToken and postExchange can use it
+      return { ...data, _enterpriseSubdomain: options.enterpriseSubdomain || "" };
     },
-    pollToken: async (config, deviceCode) => {
-      const response = await fetch(config.tokenUrl, {
+    pollToken: async (config, deviceCode, codeVerifier, extraData) => {
+      const { buildGitHubConfigUrls } = await import("./constants/oauth.js");
+      const urls = buildGitHubConfigUrls(extraData?._enterpriseSubdomain);
+      const response = await fetch(urls.tokenUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
@@ -655,12 +661,15 @@ const PROVIDERS = {
 
       return {
         ok: response.ok,
-        data: data,
+        data: { ...data, _enterpriseSubdomain: extraData?._enterpriseSubdomain || "" },
       };
     },
     postExchange: async (tokens) => {
+      const { buildGitHubConfigUrls } = await import("./constants/oauth.js");
+      const urls = buildGitHubConfigUrls(tokens._enterpriseSubdomain);
+
       // Get Copilot token using GitHub access token
-      const copilotRes = await fetch(GITHUB_CONFIG.copilotTokenUrl, {
+      const copilotRes = await fetch(urls.copilotTokenUrl, {
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
           Accept: "application/json",
@@ -671,7 +680,7 @@ const PROVIDERS = {
       const copilotToken = copilotRes.ok ? await copilotRes.json() : {};
 
       // Get user info from GitHub
-      const userRes = await fetch(GITHUB_CONFIG.userInfoUrl, {
+      const userRes = await fetch(urls.userInfoUrl, {
         headers: {
           Authorization: `Bearer ${tokens.access_token}`,
           Accept: "application/json",
@@ -694,6 +703,8 @@ const PROVIDERS = {
         githubLogin: extra?.userInfo?.login,
         githubName: extra?.userInfo?.name,
         githubEmail: extra?.userInfo?.email,
+        // Persist enterprise subdomain so all subsequent API calls use correct domain
+        enterpriseSubdomain: tokens._enterpriseSubdomain || "",
       },
     }),
   },

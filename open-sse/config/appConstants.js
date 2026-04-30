@@ -17,6 +17,47 @@ export const GITHUB_COPILOT = {
   API_VERSION: "2025-04-01",
 };
 
+/**
+ * Build GitHub URLs based on optional GHE.com enterprise subdomain.
+ * - Standard GitHub.com: pass undefined or empty string
+ * - GHE.com enterprise: pass subdomain, e.g. "mycompany" for mycompany.ghe.com
+ *
+ * GHE.com URL patterns:
+ *   Auth/OAuth:      https://SUBDOMAIN.ghe.com/login/...
+ *   API:             https://api.SUBDOMAIN.ghe.com/...
+ *   Copilot chat:    https://api.SUBDOMAIN.ghe.com/chat/completions
+ *   Copilot token:   https://api.SUBDOMAIN.ghe.com/copilot_internal/v2/token
+ */
+export function buildGitHubUrls(enterpriseSubdomain) {
+  const sub = typeof enterpriseSubdomain === "string" ? enterpriseSubdomain.trim() : "";
+
+  if (!sub) {
+    // Standard GitHub.com
+    return {
+      deviceCodeUrl: "https://github.com/login/device/code",
+      tokenUrl: "https://github.com/login/oauth/access_token",
+      userInfoUrl: "https://api.github.com/user",
+      copilotTokenUrl: "https://api.github.com/copilot_internal/v2/token",
+      copilotChatUrl: "https://api.githubcopilot.com/chat/completions",
+      copilotResponsesUrl: "https://api.githubcopilot.com/responses",
+      usageUrl: "https://api.github.com/copilot_internal/user",
+    };
+  }
+
+  // GHE.com enterprise
+  const gheBase = `https://${sub}.ghe.com`;
+  const apiBase = `https://api.${sub}.ghe.com`;
+  return {
+    deviceCodeUrl: `${gheBase}/login/device/code`,
+    tokenUrl: `${gheBase}/login/oauth/access_token`,
+    userInfoUrl: `${apiBase}/user`,
+    copilotTokenUrl: `${apiBase}/copilot_internal/v2/token`,
+    copilotChatUrl: `${apiBase}/chat/completions`,
+    copilotResponsesUrl: `${apiBase}/responses`,
+    usageUrl: `${apiBase}/copilot_internal/user`,
+  };
+}
+
 // === Antigravity enums ===
 export const IDE_TYPE = {
   UNSPECIFIED: 0,

@@ -18,6 +18,9 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
   const [isDeviceCode, setIsDeviceCode] = useState(false);
   const [deviceData, setDeviceData] = useState(null);
   const [polling, setPolling] = useState(false);
+  // GitHub Enterprise: subdomain input (e.g. "mycompany" for mycompany.ghe.com)
+  const [gheSubdomain, setGheSubdomain] = useState("");
+  const [gheSubdomainConfirmed, setGheSubdomainConfirmed] = useState(false);
   const popupRef = useRef(null);
   const pollingAbortRef = useRef(false);
   const { copied, copy } = useCopyToClipboard();
@@ -135,6 +138,12 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
       // Device code flow providers
       const deviceCodeProviders = ["github", "qwen", "kiro", "kimi-coding", "kilocode", "codebuddy"];
       if (deviceCodeProviders.includes(provider)) {
+        // GitHub Enterprise: require subdomain confirmation before starting flow
+        if (provider === "github" && !gheSubdomainConfirmed) {
+          setStep("ghe-input");
+          return;
+        }
+
         setIsDeviceCode(true);
         setStep("waiting");
 
@@ -146,6 +155,10 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
           }
           deviceCodeUrl.searchParams.set("auth_method", "idc");
         }
+        // Pass enterprise subdomain for GHE.com
+        if (provider === "github" && gheSubdomain.trim()) {
+          deviceCodeUrl.searchParams.set("enterprise_subdomain", gheSubdomain.trim());
+        }
         const res = await fetch(deviceCodeUrl.toString());
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
@@ -153,6 +166,7 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
         setDeviceData(data);
 
         // Pass extraData for Kiro (contains _clientId, _clientSecret)
+        // Pass _enterpriseSubdomain for GitHub Enterprise
         const extraData = provider === "kiro"
           ? {
               _clientId: data._clientId,
@@ -161,6 +175,8 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
               _authMethod: data._authMethod,
               _startUrl: data._startUrl,
             }
+          : provider === "github"
+          ? { _enterpriseSubdomain: data._enterpriseSubdomain || gheSubdomain.trim() }
           : null;
         startPolling(data.device_code, data.codeVerifier, data.interval || 5, extraData);
         return;
@@ -233,7 +249,14 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
       setDeviceData(null);
       setPolling(false);
       pollingAbortRef.current = false;
-      startOAuthFlow();
+      // Reset GHE state when modal reopens
+      if (provider === "github") {
+        setGheSubdomain("");
+        setGheSubdomainConfirmed(false);
+        setStep("ghe-input");
+      } else {
+        startOAuthFlow();
+      }
     } else if (!isOpen) {
       // Abort polling and cleanup proxy when modal closes
       pollingAbortRef.current = true;
@@ -362,6 +385,41 @@ export default function OAuthModal({ isOpen, provider, providerInfo, onSuccess, 
   return (
     <Modal isOpen={isOpen} title={`Connect ${providerInfo.name}`} onClose={handleClose} size="lg">
       <div className="flex flex-col gap-4">
+
+        {/* GitHub Enterprise Subdomain Input */}
+        {step === "ghe-input" && provider === "github" && (
+          <div className="flex flex-col gap-4">
+            <div className="bg-sidebar rounded-lg p-4 text-sm text-text-muted">
+              <p className="font-medium text-text-main mb-1">GitHub Enterprise (GHE.com)</p>
+              <p>If you use a personal GitHub.com account, leave this blank. If you use GitHub Enterprise Cloud (e.g. <code className="font-mono text-xs bg-bg-main px-1 rounded">mycompany.ghe.com</code>), enter your subdomain below.</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Enterprise subdomain <span className="text-text-muted font-normal">(optional)</span></label>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={gheSubdomain}
+                  onChange={(e) => setGheSubdomain(e.target.value.replace(/[^a-zA-Z0-9-]/g, ""))}
+                  placeholder="mycompany"
+                  className="flex-1 font-mono"
+                />
+                <span className="text-sm text-text-muted whitespace-nowrap">.ghe.com</span>
+              </div>
+              <p className="text-xs text-text-muted mt-1">Leave blank for standard GitHub.com</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                fullWidth
+                onClick={() => {
+                  setGheSubdomainConfirmed(true);
+                  startOAuthFlow();
+                }}
+              >
+                Continue
+              </Button>
+              <Button variant="ghost" fullWidth onClick={handleClose}>Cancel</Button>
+            </div>
+          </div>
+        )}
         {/* Waiting Step (Localhost - popup mode) */}
         {step === "waiting" && !isDeviceCode && (
           <div className="text-center py-6">

@@ -110,8 +110,12 @@ async function getGitHubUsage(accessToken, providerSpecificData, proxyOptions = 
       throw new Error("No GitHub access token available. Please re-authorize the connection.");
     }
 
+    // Build URL based on enterprise subdomain (GHE.com support)
+    const { buildGitHubUrls } = await import("../config/appConstants.js");
+    const urls = buildGitHubUrls(providerSpecificData?.enterpriseSubdomain);
+
     // copilot_internal/user API requires GitHub OAuth token, not copilotToken
-    const response = await proxyAwareFetch("https://api.github.com/copilot_internal/user", {
+    const response = await proxyAwareFetch(urls.usageUrl, {
       headers: {
         "Authorization": `token ${accessToken}`,
         "Accept": "application/json",
