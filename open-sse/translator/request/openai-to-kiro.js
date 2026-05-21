@@ -263,6 +263,13 @@ function convertMessages(messages, tools, model) {
         mergedHistory[mergedHistory.length - 1].userInputMessage) {
       const prev = mergedHistory[mergedHistory.length - 1];
       prev.userInputMessage.content += "\n\n" + current.userInputMessage.content;
+      // Merge images from consecutive user messages
+      if (current.userInputMessage.images?.length) {
+        prev.userInputMessage.images = [
+          ...(prev.userInputMessage.images || []),
+          ...current.userInputMessage.images
+        ];
+      }
     } else {
       mergedHistory.push(current);
     }
@@ -309,6 +316,9 @@ export function buildKiroPayload(model, body, stream, credentials) {
           origin: "AI_EDITOR",
           ...(currentMessage?.userInputMessage?.userInputMessageContext && {
             userInputMessageContext: currentMessage.userInputMessage.userInputMessageContext
+          }),
+          ...(currentMessage?.userInputMessage?.images?.length > 0 && {
+            images: currentMessage.userInputMessage.images
           })
         }
       },
