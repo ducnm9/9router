@@ -69,3 +69,5 @@ deploy*.sh
 ecosystem.config.*
 
 scripts/agSniffer/*
+
+.kiro

@@ -59,17 +59,19 @@ export class CloudSyncScheduler {
   /**
    * Sync with retry logic (exponential backoff)
    */
-  async syncWithRetry(maxRetries = 1) {
+  async syncWithRetry(maxRetries = 3) {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = await this.sync();
         return result;
       } catch (error) {
         if (attempt === maxRetries) {
+          console.warn(`[CLOUD_SYNC] All ${maxRetries} retry attempts failed: ${error.message}`);
           return null;
         }
         
         const delay = Math.min(1000 * Math.pow(2, attempt), 10000); // Max 10s
+        console.warn(`[CLOUD_SYNC] Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }

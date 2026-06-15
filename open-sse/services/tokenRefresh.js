@@ -726,19 +726,39 @@ export async function refreshVertexToken(saJson, log) {
 }
 
 /**
+ * Parse a Retry-After header value into milliseconds.
+ * Supports numeric seconds (e.g., "30" → 30000ms) and HTTP-date formats.
+ * @param {string|null|undefined} headerValue - The Retry-After header value
+ * @returns {number|null} Delay in milliseconds, or null if not parseable
+ */
+export function parseRetryAfter(headerValue) {
+  if (!headerValue) return null;
+  const seconds = Number(headerValue);
+  if (!isNaN(seconds)) return seconds * 1000;
+  const date = new Date(headerValue);
+  if (!isNaN(date.getTime())) return Math.max(0, date.getTime() - Date.now());
+  return null;
+}
+
+/**
  * Refresh token with retry and exponential backoff
  * Retries on failure with increasing delay: 1s, 2s, 3s...
+ * When error has retryAfterMs property, uses max(retryAfterMs, linearDelay) as delay.
  * @param {function} refreshFn - Async function that returns token or null
  * @param {number} maxRetries - Max retry attempts (default 3)
  * @param {object} log - Logger instance (optional)
  * @returns {Promise<object|null>} Token result or null if all retries fail
  */
 export async function refreshWithRetry(refreshFn, maxRetries = 3, log = null) {
+  let retryAfterDelay = 0;
+
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     if (attempt > 0) {
-      const delay = attempt * 1000;
+      const linearDelay = attempt * 1000;
+      const delay = retryAfterDelay > 0 ? Math.max(retryAfterDelay, linearDelay) : linearDelay;
       log?.debug?.("TOKEN_REFRESH", `Retry ${attempt}/${maxRetries} after ${delay}ms`);
       await new Promise(r => setTimeout(r, delay));
+      retryAfterDelay = 0;
     }
 
     try {
@@ -746,6 +766,9 @@ export async function refreshWithRetry(refreshFn, maxRetries = 3, log = null) {
       if (result) return result;
     } catch (error) {
       log?.warn?.("TOKEN_REFRESH", `Attempt ${attempt + 1}/${maxRetries} failed: ${error.message}`);
+      if (error.retryAfterMs) {
+        retryAfterDelay = error.retryAfterMs;
+      }
     }
   }
 

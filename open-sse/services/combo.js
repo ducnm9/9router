@@ -77,17 +77,28 @@ export function getComboModelsFromData(modelStr, combosData) {
  * @param {Object} options.log - Logger object
  * @param {string} [options.comboName] - Name of the combo (for round-robin tracking)
  * @param {string} [options.comboStrategy] - Strategy: "fallback" or "round-robin"
+ * @param {number} [options.comboTimeoutMs=60000] - Overall timeout in ms for all model attempts
  * @returns {Promise<Response>}
  */
-export async function handleComboChat({ body, models, handleSingleModel, log, comboName, comboStrategy }) {
+export async function handleComboChat({ body, models, handleSingleModel, log, comboName, comboStrategy, comboTimeoutMs = 60000 }) {
   // Apply rotation strategy if enabled
   const rotatedModels = getRotatedModels(models, comboName, comboStrategy);
+  const startTime = Date.now();
   
   let lastError = null;
   let earliestRetryAfter = null;
   let lastStatus = null;
 
   for (let i = 0; i < rotatedModels.length; i++) {
+    // Check overall timeout before trying next model
+    const elapsed = Date.now() - startTime;
+    if (elapsed >= comboTimeoutMs) {
+      log.warn("COMBO", `Overall timeout reached (${comboTimeoutMs}ms) after ${i} models`);
+      return new Response(
+        JSON.stringify({ error: { message: `Combo timeout: ${elapsed}ms exceeded ${comboTimeoutMs}ms limit` } }),
+        { status: 504, headers: { "Content-Type": "application/json" } }
+      );
+    }
     const modelStr = rotatedModels[i];
     log.info("COMBO", `Trying model ${i + 1}/${rotatedModels.length}: ${modelStr}`);
 

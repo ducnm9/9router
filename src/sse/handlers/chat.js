@@ -104,7 +104,8 @@ export async function handleChat(request, clientRawRequest = null) {
       handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
       log,
       comboName: modelStr,
-      comboStrategy
+      comboStrategy,
+      comboTimeoutMs: settings.comboTimeoutMs || 60000
     });
   }
 
@@ -135,7 +136,8 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
         handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
         log,
         comboName: modelStr,
-        comboStrategy
+        comboStrategy,
+        comboTimeoutMs: chatSettings.comboTimeoutMs || 60000
       });
     }
     log.warn("CHAT", "Invalid model format", { model: modelStr });
