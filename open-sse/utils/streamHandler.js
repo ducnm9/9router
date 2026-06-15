@@ -89,6 +89,7 @@ export function createStreamController({ onDisconnect, onError, log, provider, m
 export function createDisconnectAwareStream(transformStream, streamController) {
   const reader = transformStream.readable.getReader();
   const writer = transformStream.writable.getWriter();
+  const encoder = new TextEncoder();
 
   return new ReadableStream({
     async pull(controller) {
@@ -110,7 +111,25 @@ export function createDisconnectAwareStream(transformStream, streamController) {
         // Cleanup reader/writer to avoid orphaned streams
         reader.cancel().catch(() => {});
         writer.abort().catch(() => {});
-        controller.error(error);
+
+        // For socket-level errors during streaming, send an SSE error event
+        // so the client gets a meaningful message instead of raw socket error
+        const isSocketError = error.message?.toLowerCase().includes("socket") ||
+          error.message?.toLowerCase().includes("econnreset") ||
+          error.message?.toLowerCase().includes("network");
+        if (isSocketError) {
+          try {
+            const errorEvent = `data: ${JSON.stringify({
+              error: { message: "Upstream connection lost during streaming. The provider may have timed out.", type: "connection_error", code: "socket_closed" }
+            })}\n\ndata: [DONE]\n\n`;
+            controller.enqueue(encoder.encode(errorEvent));
+            controller.close();
+          } catch {
+            controller.error(error);
+          }
+        } else {
+          controller.error(error);
+        }
       }
     },
 

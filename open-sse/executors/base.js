@@ -1,6 +1,16 @@
-import { HTTP_STATUS, RETRY_CONFIG, DEFAULT_RETRY_CONFIG, resolveRetryEntry } from "../config/runtimeConfig.js";
+import { HTTP_STATUS, RETRY_CONFIG, DEFAULT_RETRY_CONFIG, UPSTREAM_CONFIG, resolveRetryEntry } from "../config/runtimeConfig.js";
 import { resolveOllamaLocalHost } from "../config/providers.js";
 import { proxyAwareFetch } from "../utils/proxyFetch.js";
+
+// Bun-specific socket errors that indicate connection was dropped (not a server error)
+const SOCKET_ERROR_PATTERNS = [
+  "socket connection was closed unexpectedly",
+  "connection was forcibly closed",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "socket hang up",
+  "network socket disconnected",
+];
 
 /**
  * BaseExecutor - Base class for provider executors
@@ -126,11 +136,18 @@ export class BaseExecutor {
       if (!retryAttemptsByUrl[urlIndex]) retryAttemptsByUrl[urlIndex] = 0;
 
       try {
+        // Combine client abort signal with upstream timeout to prevent Bun from
+        // closing the socket when waiting for long-thinking models (e.g. Claude thinking, o1)
+        const timeoutMs = UPSTREAM_CONFIG.socketTimeoutMs;
+        const upstreamSignal = signal
+          ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)])
+          : AbortSignal.timeout(timeoutMs);
+
         const response = await proxyAwareFetch(url, {
           method: "POST",
           headers,
           body: JSON.stringify(transformedBody),
-          signal
+          signal: upstreamSignal
         }, proxyOptions);
 
         if (await tryRetry(urlIndex, response.status, `status ${response.status}`)) { urlIndex--; continue; }
@@ -144,7 +161,37 @@ export class BaseExecutor {
         return { response, url, headers, transformedBody };
       } catch (error) {
         lastError = error;
-        if (error.name === "AbortError") throw error;
+        if (error.name === "AbortError") {
+          // Distinguish client abort (external signal) from our timeout abort
+          // If the external signal was aborted, the client disconnected — propagate immediately
+          if (signal?.aborted) throw error;
+          // Otherwise it's our socketTimeoutMs timeout — treat as retryable socket error
+          const { attempts, delayMs } = UPSTREAM_CONFIG.socketRetry;
+          const timeoutRetries = retryAttemptsByUrl[`timeout_${urlIndex}`] || 0;
+          if (timeoutRetries < attempts) {
+            retryAttemptsByUrl[`timeout_${urlIndex}`] = timeoutRetries + 1;
+            log?.debug?.("RETRY", `Upstream timeout (${UPSTREAM_CONFIG.socketTimeoutMs / 1000}s) retry ${timeoutRetries + 1}/${attempts} after ${delayMs / 1000}s`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            urlIndex--;
+            continue;
+          }
+          throw error;
+        }
+
+        // Check if this is a socket-level error (Bun: "socket connection was closed unexpectedly")
+        const isSocketError = SOCKET_ERROR_PATTERNS.some(p => error.message?.toLowerCase().includes(p.toLowerCase()));
+
+        if (isSocketError) {
+          const { attempts, delayMs } = UPSTREAM_CONFIG.socketRetry;
+          const socketRetries = retryAttemptsByUrl[`socket_${urlIndex}`] || 0;
+          if (socketRetries < attempts) {
+            retryAttemptsByUrl[`socket_${urlIndex}`] = socketRetries + 1;
+            log?.debug?.("RETRY", `Socket error "${error.message}" retry ${socketRetries + 1}/${attempts} after ${delayMs / 1000}s`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+            urlIndex--;
+            continue;
+          }
+        }
 
         // Map network/fetch exceptions to 502 retry config
         if (await tryRetry(urlIndex, HTTP_STATUS.BAD_GATEWAY, `network "${error.message}"`)) { urlIndex--; continue; }

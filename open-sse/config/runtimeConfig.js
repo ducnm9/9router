@@ -31,6 +31,14 @@ export const MEMORY_CONFIG = {
   proxyDispatchersMaxSize: 20,
 };
 
+// Upstream connection config (to prevent socket closed unexpectedly)
+export const UPSTREAM_CONFIG = {
+  // Socket timeout for waiting initial response (10 minutes — long thinking models like Claude/o1)
+  socketTimeoutMs: 10 * 60 * 1000,
+  // Retry on socket/connection errors (not HTTP errors)
+  socketRetry: { attempts: 2, delayMs: 1000 },
+};
+
 // Default token limits
 export const DEFAULT_MAX_TOKENS = 64000;
 export const DEFAULT_MIN_TOKENS = 32000;
