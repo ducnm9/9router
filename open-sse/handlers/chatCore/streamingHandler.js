@@ -4,6 +4,7 @@ import { createSSETransformStreamWithLogger, createPassthroughStreamWithLogger }
 import { pipeWithDisconnect } from "../../utils/streamHandler.js";
 import { buildRequestDetail, extractRequestConfig, saveUsageStats } from "./requestDetail.js";
 import { saveRequestDetail } from "@/lib/usageDb.js";
+import { recordCaveman } from "../../rtk/metricsStore.js";
 
 const SSE_HEADERS = {
   "Content-Type": "text/event-stream",
@@ -68,7 +69,7 @@ export function handleStreamingResponse({ providerResponse, provider, model, sou
 /**
  * Build onStreamComplete callback for streaming usage tracking.
  */
-export function buildOnStreamComplete({ provider, model, connectionId, apiKey, requestStartTime, body, stream, finalBody, translatedBody, clientRawRequest }) {
+export function buildOnStreamComplete({ provider, model, connectionId, apiKey, requestStartTime, body, stream, finalBody, translatedBody, clientRawRequest, cavemanEnabled, cavemanLevel }) {
   const streamDetailId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
 
   const onStreamComplete = (contentObj, usage, ttftAt) => {
@@ -93,6 +94,13 @@ export function buildOnStreamComplete({ provider, model, connectionId, apiKey, r
     });
 
     saveUsageStats({ provider, model, tokens: usage, connectionId, apiKey, endpoint: clientRawRequest?.endpoint, label: "STREAM USAGE" });
+
+    if (cavemanEnabled && cavemanLevel) {
+      try {
+        const outputTokens = usage?.completion_tokens ?? usage?.output_tokens ?? null;
+        recordCaveman({ level: cavemanLevel, model, outputTokens });
+      } catch (e) { /* non-critical */ }
+    }
   };
 
   return { onStreamComplete, streamDetailId };

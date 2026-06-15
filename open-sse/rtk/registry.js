@@ -9,6 +9,8 @@ import { tree } from "./filters/tree.js";
 import { smartTruncate } from "./filters/smartTruncate.js";
 import { readNumbered } from "./filters/readNumbered.js";
 import { searchList } from "./filters/searchList.js";
+import { cavemanCompress } from "./filters/cavemanCompress.js";
+import { cavecrew } from "./filters/cavecrew.js";
 
 const REGISTRY = {
   [FILTERS.GIT_DIFF]: gitDiff,
@@ -20,7 +22,9 @@ const REGISTRY = {
   [FILTERS.TREE]: tree,
   [FILTERS.SMART_TRUNCATE]: smartTruncate,
   [FILTERS.READ_NUMBERED]: readNumbered,
-  [FILTERS.SEARCH_LIST]: searchList
+  [FILTERS.SEARCH_LIST]: searchList,
+  [FILTERS.CAVEMAN_COMPRESS]: cavemanCompress,
+  [FILTERS.CAVECREW]: cavecrew
 };
 
 // Rust resolve_filter aliases (pipe_cmd.rs): grep|rg, find|fd

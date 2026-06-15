@@ -50,5 +50,7 @@ export const FILTERS = {
   DEDUP_LOG: "dedup-log",
   SMART_TRUNCATE: "smart-truncate",
   READ_NUMBERED: "read-numbered",
-  SEARCH_LIST: "search-list"
+  SEARCH_LIST: "search-list",
+  CAVEMAN_COMPRESS: "caveman-compress",
+  CAVECREW: "cavecrew"
 };

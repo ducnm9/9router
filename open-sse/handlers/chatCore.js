@@ -18,6 +18,7 @@ import { handleStreamingResponse, buildOnStreamComplete } from "./chatCore/strea
 import { detectClientTool, isNativePassthrough } from "../utils/clientDetector.js";
 import { injectCaveman } from "../rtk/caveman.js";
 import { compressMessages, formatRtkLog } from "../rtk/index.js";
+import { recordRtk, recordCaveman } from "../rtk/metricsStore.js";
 
 /**
  * Core chat handler - shared between SSE and Worker
@@ -102,6 +103,9 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   const rtkStats = compressMessages(translatedBody, rtkEnabled);
   const rtkLine = formatRtkLog(rtkStats);
   if (rtkLine) console.log(rtkLine);
+  if (rtkStats) {
+    try { recordRtk(rtkStats); } catch (e) { /* non-critical */ }
+  }
 
   // Caveman: inject terse-style system prompt
   if (cavemanEnabled && cavemanLevel) {
@@ -250,7 +254,7 @@ export async function handleChatCore({ body, modelInfo, credentials, log, onCred
   }
 
   // Streaming response
-  const { onStreamComplete } = buildOnStreamComplete({ ...sharedCtx });
+  const { onStreamComplete } = buildOnStreamComplete({ ...sharedCtx, cavemanEnabled, cavemanLevel });
   return handleStreamingResponse({ ...sharedCtx, providerResponse, sourceFormat, targetFormat, userAgent, reqLogger, toolNameMap, streamController, onStreamComplete });
 }
 
