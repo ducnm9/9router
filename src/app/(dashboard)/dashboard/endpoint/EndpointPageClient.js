@@ -64,6 +64,10 @@ export default function APIPageClient({ machineId }) {
   // Quota state
   const [quotaSummary, setQuotaSummary] = useState(null);
   const [newKeyQuota, setNewKeyQuota] = useState({ maxTokens: null, maxCost: null, warningThreshold: 0.8 });
+  const [editQuotaKey, setEditQuotaKey] = useState(null); // key object being edited
+  const [editQuotaForm, setEditQuotaForm] = useState({ maxTokens: null, maxCost: null, warningThreshold: 0.8 });
+  const [viewQuotaKey, setViewQuotaKey] = useState(null); // key object being viewed
+  const [viewQuotaData, setViewQuotaData] = useState(null); // quota detail from API
 
   // API key visibility toggle state
   const [visibleKeys, setVisibleKeys] = useState(new Set());
@@ -644,6 +648,52 @@ export default function APIPageClient({ machineId }) {
     }
   };
 
+  const handleEditQuota = (key) => {
+    const quota = key.quota || { maxTokens: null, maxCost: null, warningThreshold: 0.8 };
+    setEditQuotaForm({
+      maxTokens: quota.maxTokens || "",
+      maxCost: quota.maxCost || "",
+      warningThreshold: quota.warningThreshold || 0.8,
+    });
+    setEditQuotaKey(key);
+  };
+
+  const handleSaveQuota = async () => {
+    if (!editQuotaKey) return;
+    try {
+      const payload = {
+        maxTokens: editQuotaForm.maxTokens ? parseInt(editQuotaForm.maxTokens) : null,
+        maxCost: editQuotaForm.maxCost ? parseFloat(editQuotaForm.maxCost) : null,
+        warningThreshold: editQuotaForm.warningThreshold ? parseFloat(editQuotaForm.warningThreshold) : 0.8,
+      };
+      const res = await fetch(`/api/keys/${editQuotaKey.id}/quota`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        await fetchData();
+        setEditQuotaKey(null);
+      }
+    } catch (error) {
+      console.log("Error saving quota:", error);
+    }
+  };
+
+  const handleViewQuota = async (key) => {
+    setViewQuotaKey(key);
+    setViewQuotaData(null);
+    try {
+      const res = await fetch(`/api/keys/${key.id}/quota`);
+      if (res.ok) {
+        const data = await res.json();
+        setViewQuotaData(data);
+      }
+    } catch (error) {
+      console.log("Error fetching quota details:", error);
+    }
+  };
+
   const maskKey = (fullKey) => {
     if (!fullKey) return "";
     return fullKey.length > 8 ? fullKey.slice(0, 8) + "..." : fullKey;
@@ -1029,6 +1079,20 @@ export default function APIPageClient({ machineId }) {
                   })()}
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handleViewQuota(key)}
+                    className="p-2 hover:bg-primary/10 rounded text-text-muted hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+                    title="View usage"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">bar_chart</span>
+                  </button>
+                  <button
+                    onClick={() => handleEditQuota(key)}
+                    className="p-2 hover:bg-primary/10 rounded text-text-muted hover:text-primary opacity-0 group-hover:opacity-100 transition-all"
+                    title="Edit quota"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                  </button>
                   <Toggle
                     size="sm"
                     checked={key.isActive ?? true}
@@ -1165,6 +1229,135 @@ export default function APIPageClient({ machineId }) {
             Done
           </Button>
         </div>
+      </Modal>
+
+      {/* Edit Quota Modal */}
+      <Modal
+        isOpen={!!editQuotaKey}
+        title={`Edit Quota — ${editQuotaKey?.name || ""}`}
+        onClose={() => setEditQuotaKey(null)}
+      >
+        <div className="flex flex-col gap-4">
+          <Input
+            label="Monthly Token Limit"
+            type="number"
+            value={editQuotaForm.maxTokens || ""}
+            onChange={(e) => setEditQuotaForm({ ...editQuotaForm, maxTokens: e.target.value })}
+            placeholder="e.g. 1000000 (empty = unlimited)"
+          />
+          <Input
+            label="Monthly Cost Limit (USD)"
+            type="number"
+            step="0.01"
+            value={editQuotaForm.maxCost || ""}
+            onChange={(e) => setEditQuotaForm({ ...editQuotaForm, maxCost: e.target.value })}
+            placeholder="e.g. 5.00 (empty = unlimited)"
+          />
+          <Input
+            label="Warning Threshold"
+            type="number"
+            step="0.05"
+            min="0.1"
+            max="0.99"
+            value={editQuotaForm.warningThreshold || ""}
+            onChange={(e) => setEditQuotaForm({ ...editQuotaForm, warningThreshold: e.target.value })}
+            placeholder="0.8 (80%)"
+          />
+          <div className="flex gap-2">
+            <Button onClick={handleSaveQuota} fullWidth>
+              Save
+            </Button>
+            <Button onClick={() => setEditQuotaKey(null)} variant="ghost" fullWidth>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* View Quota Usage Modal */}
+      <Modal
+        isOpen={!!viewQuotaKey}
+        title={`Usage — ${viewQuotaKey?.name || ""}`}
+        onClose={() => setViewQuotaKey(null)}
+      >
+        {!viewQuotaData ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-text-muted">Loading...</p>
+          </div>
+        ) : !viewQuotaData.quota ? (
+          <div className="text-center py-8">
+            <p className="text-sm text-text-muted">No quota configured for this key.</p>
+            <Button className="mt-4" onClick={() => { setViewQuotaKey(null); handleEditQuota(viewQuotaKey); }}>
+              Set Quota
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-black/[0.02] dark:bg-white/[0.02] rounded-lg p-3">
+                <p className="text-xs text-text-muted mb-1">Tokens Used</p>
+                <p className="text-lg font-semibold">{viewQuotaData.usage.totalTokens.toLocaleString()}</p>
+                <p className="text-xs text-text-muted">/ {viewQuotaData.quota.maxTokens ? viewQuotaData.quota.maxTokens.toLocaleString() : "Unlimited"}</p>
+              </div>
+              <div className="bg-black/[0.02] dark:bg-white/[0.02] rounded-lg p-3">
+                <p className="text-xs text-text-muted mb-1">Cost Used</p>
+                <p className="text-lg font-semibold">${viewQuotaData.usage.totalCost.toFixed(4)}</p>
+                <p className="text-xs text-text-muted">/ {viewQuotaData.quota.maxCost ? `$${viewQuotaData.quota.maxCost.toFixed(2)}` : "Unlimited"}</p>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex justify-between text-xs text-text-muted mb-1">
+                <span>Tokens: {viewQuotaData.percentage.tokens}%</span>
+                <span>Cost: {viewQuotaData.percentage.cost}%</span>
+              </div>
+              <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${
+                    Math.max(viewQuotaData.percentage.tokens, viewQuotaData.percentage.cost) >= 100
+                      ? "bg-red-500"
+                      : Math.max(viewQuotaData.percentage.tokens, viewQuotaData.percentage.cost) >= (viewQuotaData.quota.warningThreshold || 0.8) * 100
+                        ? "bg-yellow-500"
+                        : "bg-green-500"
+                  }`}
+                  style={{ width: `${Math.min(Math.max(viewQuotaData.percentage.tokens, viewQuotaData.percentage.cost), 100)}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-text-muted text-xs">Period</p>
+                <p className="font-medium">{viewQuotaData.period}</p>
+              </div>
+              <div>
+                <p className="text-text-muted text-xs">Resets At</p>
+                <p className="font-medium">{new Date(viewQuotaData.resetsAt).toLocaleDateString()}</p>
+              </div>
+              <div>
+                <p className="text-text-muted text-xs">Warning Threshold</p>
+                <p className="font-medium">{(viewQuotaData.quota.warningThreshold || 0.8) * 100}%</p>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-border">
+              <Button onClick={() => { setViewQuotaKey(null); handleEditQuota(viewQuotaKey); }} variant="secondary" fullWidth>
+                Edit Quota
+              </Button>
+              <Button
+                onClick={async () => {
+                  await fetch(`/api/keys/${viewQuotaKey.id}/quota/reset`, { method: "POST" });
+                  handleViewQuota(viewQuotaKey);
+                  await fetchData();
+                }}
+                variant="ghost"
+                fullWidth
+              >
+                Reset Counter
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Enable Tunnel Modal */}
