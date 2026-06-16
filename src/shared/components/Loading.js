@@ -27,7 +27,7 @@ export function Spinner({ size = "md", className }) {
 // Full page loading
 export function PageLoading({ message = "Loading..." }) {
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-bg/80 backdrop-blur-sm">
       <Spinner size="xl" />
       <p className="mt-4 text-text-muted">{message}</p>
     </div>
@@ -50,7 +50,7 @@ export function Skeleton({ className, ...props }) {
 // Card skeleton
 export function CardSkeleton() {
   return (
-    <div className="p-6 rounded-xl border border-border bg-surface">
+    <div className="p-6 rounded-xl border border-border glass">
       <div className="flex items-center justify-between mb-4">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="size-10 rounded-lg" />

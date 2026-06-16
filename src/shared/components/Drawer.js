@@ -55,7 +55,7 @@ export default function Drawer({
       
       {/* Drawer panel */}
       <div className={cn(
-        "absolute right-0 top-0 h-full bg-surface shadow-2xl flex flex-col",
+        "absolute right-0 top-0 h-full glass-strong shadow-2xl flex flex-col",
         "animate-in slide-in-from-right duration-200",
         "border-l border-black/10 dark:border-white/10",
         widths[width] || widths.md,
