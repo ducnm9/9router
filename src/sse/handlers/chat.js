@@ -9,6 +9,7 @@ import {
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings, getApiKeyByValue } from "@/lib/localDb";
+import { isKeyExpired } from "@/lib/db/repos/apiKeysRepo.js";
 import { apiKeyLimiter, ipLimiter } from "@/lib/rateLimiter.js";
 import { getClientIp } from "@/lib/auth/loginLimiter.js";
 import { getCounter, checkQuota } from "@/lib/quotaDb";
@@ -79,6 +80,14 @@ export async function handleChat(request, clientRawRequest = null) {
     if (!valid) {
       log.warn("AUTH", "Invalid API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
+    }
+    // Check key expiration
+    const keyRecord = await getApiKeyByValue(apiKey);
+    if (keyRecord && isKeyExpired(keyRecord)) {
+      log.warn("AUTH", "Expired API key");
+      return new Response(JSON.stringify({
+        error: { message: "API key has expired", type: "authentication_error", code: "key_expired" }
+      }), { status: 401, headers: { "Content-Type": "application/json" } });
     }
   }
 

@@ -30,6 +30,7 @@ export async function PUT(request, { params }) {
 
     const updateData = {};
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (body.expiresAt !== undefined) updateData.expiresAt = body.expiresAt;
 
     const updated = await updateApiKey(id, updateData);
 

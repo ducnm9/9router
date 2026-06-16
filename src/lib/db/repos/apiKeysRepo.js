@@ -14,6 +14,7 @@ function rowToKey(row) {
     machineId: row.machineId,
     isActive: row.isActive === 1 || row.isActive === true,
     quota,
+    expiresAt: row.expiresAt ?? null,
     createdAt: row.createdAt,
   };
 }
@@ -30,7 +31,7 @@ export async function getApiKeyById(id) {
   return rowToKey(row);
 }
 
-export async function createApiKey(name, machineId) {
+export async function createApiKey(name, machineId, { expiresAt = null } = {}) {
   if (!machineId) throw new Error("machineId is required");
   const db = await getAdapter();
   const { generateApiKeyWithMachine } = await import("@/shared/utils/apiKey");
@@ -41,11 +42,12 @@ export async function createApiKey(name, machineId) {
     key: result.key,
     machineId,
     isActive: true,
+    expiresAt: expiresAt ?? null,
     createdAt: new Date().toISOString(),
   };
   db.run(
-    `INSERT INTO apiKeys(id, key, name, machineId, isActive, createdAt) VALUES(?, ?, ?, ?, ?, ?)`,
-    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.createdAt]
+    `INSERT INTO apiKeys(id, key, name, machineId, isActive, expiresAt, createdAt) VALUES(?, ?, ?, ?, ?, ?, ?)`,
+    [apiKey.id, apiKey.key, apiKey.name, apiKey.machineId, 1, apiKey.expiresAt, apiKey.createdAt]
   );
   return apiKey;
 }
@@ -60,8 +62,8 @@ export async function updateApiKey(id, data) {
     const merged = { ...current, ...data };
     const quotaStr = merged.quota ? JSON.stringify(merged.quota) : null;
     db.run(
-      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, quota = ? WHERE id = ?`,
-      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, quotaStr, id]
+      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, quota = ?, expiresAt = ? WHERE id = ?`,
+      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, quotaStr, merged.expiresAt ?? null, id]
     );
     result = merged;
   });
@@ -85,4 +87,26 @@ export async function getApiKeyByValue(key) {
   const db = await getAdapter();
   const row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]);
   return rowToKey(row);
+}
+
+export function isKeyExpired(key) {
+  if (!key.expiresAt) return false;
+  return new Date(key.expiresAt) <= new Date();
+}
+
+export function getExpirationStatus(key) {
+  if (!key.expiresAt) {
+    return { expired: false, warning: false, daysRemaining: null, expiresAt: null };
+  }
+  const now = new Date();
+  const expires = new Date(key.expiresAt);
+  const msRemaining = expires - now;
+  const daysRemaining = Math.floor(msRemaining / 86400000);
+
+  return {
+    expired: msRemaining <= 0,
+    warning: daysRemaining <= 7 && daysRemaining > 0,
+    daysRemaining: Math.max(0, daysRemaining),
+    expiresAt: key.expiresAt,
+  };
 }
