@@ -372,6 +372,24 @@ export const PROVIDERS = {
     baseUrl: "https://api.cloudflare.com/client/v4/accounts/{accountId}/ai/v1/chat/completions",
     format: "openai"
   },
+  "mimo-free": { baseUrl: "https://api.xiaomimimo.com/api/free-ai/openai/chat", format: "openai", noAuth: true },
+  mmf: { baseUrl: "https://api.xiaomimimo.com/api/free-ai/openai/chat", format: "openai", noAuth: true },
+  predibase: { baseUrl: "https://serving.app.predibase.com/v1/chat/completions", format: "openai" },
+  bytez: { baseUrl: "https://api.bytez.com/models/v2", format: "openai" },
+  morph: { baseUrl: "https://api.morphllm.com/v1/chat/completions", format: "openai" },
+  longcat: { baseUrl: "https://api.longcat.chat/openai/v1/chat/completions", format: "openai" },
+  puter: { baseUrl: "https://api.puter.com/puterai/openai/v1/chat/completions", format: "openai" },
+  uncloseai: { baseUrl: "https://hermes.ai.unturf.com/v1/chat/completions", format: "openai", noAuth: true },
+  scaleway: { baseUrl: "https://api.scaleway.ai/v1/chat/completions", format: "openai" },
+  deepinfra: { baseUrl: "https://api.deepinfra.com/v1/openai/chat/completions", format: "openai" },
+  sambanova: { baseUrl: "https://api.sambanova.ai/v1/chat/completions", format: "openai" },
+  nscale: { baseUrl: "https://inference.api.nscale.com/v1/chat/completions", format: "openai" },
+  baseten: { baseUrl: "https://inference.baseten.co/v1/chat/completions", format: "openai" },
+  publicai: { baseUrl: "https://api.publicai.co/v1/chat/completions", format: "openai" },
+  "nous-research": { baseUrl: "https://inference-api.nousresearch.com/v1/chat/completions", format: "openai" },
+  glhf: { baseUrl: "https://glhf.chat/api/openai/v1/chat/completions", format: "openai" },
+  blackbox: { baseUrl: "https://api.blackbox.ai/chat/completions", format: "openai" },
+>>>>>>> b40e96d (feat(provider): add MiMo Free no-auth provider)
 };
 
 export const OLLAMA_LOCAL_DEFAULT_HOST = "http://localhost:11434";

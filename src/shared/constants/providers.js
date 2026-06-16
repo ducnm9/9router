@@ -10,6 +10,7 @@ export const FREE_PROVIDERS = {
   // qoder: { id: "qoder", alias: "qd", name: "Qoder AI", icon: "water_drop", color: "#EC4899" },
   iflow: { id: "iflow", alias: "if", name: "iFlow AI", icon: "water_drop", color: "#6366F1" },
   opencode: { id: "opencode", alias: "oc", name: "OpenCode Free", icon: "terminal", color: "#E87040", textIcon: "OC", noAuth: true, passthroughModels: true, modelsFetcher: { url: "https://opencode.ai/zen/v1/models", type: "opencode-free" } },
+  "mimo-free": { id: "mimo-free", alias: "mmf", name: "MiMo Code Free", icon: "smart_toy", color: "#FF6900", textIcon: "MF", noAuth: true, passthroughModels: true, modelsFetcher: { url: "https://models.dev/api.json", type: "mimo-free" } },
 };
 
 // Free Tier Providers (has free access but may require account/API key)

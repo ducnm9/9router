@@ -13,6 +13,7 @@ import { OpenCodeExecutor } from "./opencode.js";
 import { OpenCodeGoExecutor } from "./opencode-go.js";
 import { GrokWebExecutor } from "./grok-web.js";
 import { PerplexityWebExecutor } from "./perplexity-web.js";
+import { MimoFreeExecutor } from "./mimo-free.js";
 import { DefaultExecutor } from "./default.js";
 
 const executors = {
@@ -33,6 +34,8 @@ const executors = {
   "opencode-go": new OpenCodeGoExecutor(),
   "grok-web": new GrokWebExecutor(),
   "perplexity-web": new PerplexityWebExecutor(),
+  "mimo-free": new MimoFreeExecutor(),
+  mmf: new MimoFreeExecutor(), // Alias for mimo-free
 };
 
 const defaultCache = new Map();
@@ -64,3 +67,4 @@ export { OpenCodeExecutor } from "./opencode.js";
 export { OpenCodeGoExecutor } from "./opencode-go.js";
 export { GrokWebExecutor } from "./grok-web.js";
 export { PerplexityWebExecutor } from "./perplexity-web.js";
+export { MimoFreeExecutor } from "./mimo-free.js";
