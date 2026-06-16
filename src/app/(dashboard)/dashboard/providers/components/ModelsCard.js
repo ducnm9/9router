@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import PropTypes from "prop-types";
 import { Card, Button, Modal } from "@/shared/components";
-import { getModelsByProviderId } from "@/shared/constants/models";
+import { getModelsByProviderId, getModelKind } from "@/shared/constants/models";
 import { getProviderAlias } from "@/shared/constants/providers";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 
@@ -165,7 +165,10 @@ export default function ModelsCard({ providerId, kindFilter, providerAliasOverri
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ providerAlias, id: modelId, type: effectiveType }),
       });
-      if (res.ok) await fetchData();
+      if (res.ok) {
+        await fetchData();
+        window.dispatchEvent(new CustomEvent("customModelChanged"));
+      }
     } catch (e) { console.log("add custom model error:", e); }
   };
 
@@ -173,7 +176,10 @@ export default function ModelsCard({ providerId, kindFilter, providerAliasOverri
     try {
       const params = new URLSearchParams({ providerAlias, id: modelId, type: effectiveType });
       const res = await fetch(`/api/models/custom?${params}`, { method: "DELETE" });
-      if (res.ok) await fetchData();
+      if (res.ok) {
+        await fetchData();
+        window.dispatchEvent(new CustomEvent("customModelChanged"));
+      }
     } catch (e) { console.log("delete custom model error:", e); }
   };
 
@@ -200,14 +206,14 @@ export default function ModelsCard({ providerId, kindFilter, providerAliasOverri
   const builtInModels = kindFilter
     ? allBuiltIn.filter((m) => {
         if (m.kinds) return m.kinds.includes(kindFilter);
-        return (m.type || "llm") === kindFilter;
+        return getModelKind(m, "llm") === kindFilter;
       })
     : allBuiltIn;
 
   // Custom models for this provider + kind, dedupe vs built-in
   const myCustomModels = customModels.filter(
     (m) => m.providerAlias === providerAlias
-      && (m.type || "llm") === effectiveType
+      && getModelKind(m, "llm") === effectiveType
       && !builtInModels.some((b) => b.id === m.id)
   );
 

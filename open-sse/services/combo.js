@@ -4,38 +4,138 @@
 
 import { checkFallbackError, formatRetryAfter } from "./accountFallback.js";
 import { unavailableResponse } from "../utils/error.js";
+import { getCapabilitiesForModel } from "../providers/capabilities.js";
+
+// Hard capabilities = input modalities; missing one drops request data (e.g. image
+// stripped). Must be prioritized. Soft (e.g. search) only degrades a feature.
+const HARD_CAPS = new Set(["vision", "pdf", "audioInput", "videoInput"]);
+
+// Reorder combo models by capability fit. Stable; never drops a model (fallback intact).
+// Tier 0: satisfies all hard + all soft. Tier 1: all hard only. Tier 2: rest.
+export function reorderByCapabilities(models, required) {
+  if (!required || required.size === 0 || !Array.isArray(models) || models.length <= 1) return models;
+  const hard = [...required].filter((c) => HARD_CAPS.has(c));
+  const soft = [...required].filter((c) => !HARD_CAPS.has(c));
+
+  const tierOf = (m) => {
+    const slash = typeof m === "string" ? m.indexOf("/") : -1;
+    const provider = slash > 0 ? m.slice(0, slash) : "";
+    const model = slash > 0 ? m.slice(slash + 1) : m;
+    const caps = getCapabilitiesForModel(provider, model);
+    if (!hard.every((c) => caps[c] === true)) return 2;
+    return soft.every((c) => caps[c] === true) ? 0 : 1;
+  };
+
+  // Stable sort by tier (Array.prototype.sort is stable in modern engines).
+  return models
+    .map((m, i) => ({ m, i, t: tierOf(m) }))
+    .sort((a, b) => a.t - b.t || a.i - b.i)
+    .map((x) => x.m);
+}
 
 /**
  * Track rotation state per combo (for round-robin strategy)
- * @type {Map<string, number>}
+ * @type {Map<string, { index: number, consecutiveUseCount: number }>}
  */
 const comboRotationState = new Map();
+
+// Last array item whose role is "user" (current turn), or the last item when no
+// role is present. History media (older turns) must not pin the combo to a vision
+// model — those get stripped + placeholdered downstream instead.
+function lastUserItem(arr) {
+  if (!Array.isArray(arr) || arr.length === 0) return null;
+  for (let i = arr.length - 1; i >= 0; i--) {
+    if (!arr[i]?.role || arr[i].role === "user") return arr[i];
+  }
+  return arr[arr.length - 1];
+}
+
+// Detect which capabilities a request needs. Modalities (vision/pdf) are scanned
+// only on the current user turn; "search" is request-wide (lives in tools).
+// Returns a Set of: "vision" | "pdf" | "search".
+export function detectRequiredCapabilities(body) {
+  const required = new Set();
+  if (!body || typeof body !== "object") return required;
+
+  const scanBlock = (b) => {
+    if (!b || typeof b !== "object") return;
+    const t = b.type;
+    if (t === "image_url" || t === "image" || t === "input_image") required.add("vision");
+    if (t === "file" || t === "document" || t === "input_file") required.add("pdf");
+    // gemini parts: inlineData/fileData carry a mime
+    const mime = b.inlineData?.mimeType || b.fileData?.mimeType;
+    if (typeof mime === "string" && mime.startsWith("image/")) required.add("vision");
+    if (mime === "application/pdf") required.add("pdf");
+  };
+
+  const scanContent = (content) => {
+    if (Array.isArray(content)) for (const b of content) scanBlock(b);
+  };
+
+  // Modalities: current user turn only (last item across each known shape).
+  const lastMsg = lastUserItem(body.messages);     // openai / claude
+  if (lastMsg) scanContent(lastMsg.content);
+  const lastInput = lastUserItem(body.input);      // responses
+  if (lastInput) scanContent(lastInput.content);
+  const contents = body.contents || body.request?.contents; // gemini / antigravity
+  const lastContent = lastUserItem(contents);
+  if (lastContent) scanContent(lastContent.parts);
+
+  // search: temporarily disabled in auto-switch (feature not wired yet).
+
+  return required;
+}
+
+function normalizeStickyLimit(stickyLimit) {
+  const parsed = Number.parseInt(stickyLimit, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function rotateModelsFromIndex(models, currentIndex) {
+  const rotatedModels = [...models];
+  for (let i = 0; i < currentIndex; i++) {
+    const moved = rotatedModels.shift();
+    rotatedModels.push(moved);
+  }
+  return rotatedModels;
+}
 
 /**
  * Get rotated model list based on strategy
  * @param {string[]} models - Array of model strings
  * @param {string} comboName - Name of the combo
  * @param {string} strategy - "fallback" or "round-robin"
+ * @param {number|string} [stickyLimit=1] - Requests per combo model before switching
  * @returns {string[]} Rotated models array
  */
-export function getRotatedModels(models, comboName, strategy) {
+export function getRotatedModels(models, comboName, strategy, stickyLimit = 1) {
   if (!models || models.length <= 1 || strategy !== "round-robin") {
     return models;
   }
 
-  const currentIndex = comboRotationState.get(comboName) || 0;
-  const rotatedModels = [...models];
-  
-  // Rotate: move models from currentIndex to front, preserving order after
-  for (let i = 0; i < currentIndex; i++) {
-    const moved = rotatedModels.shift();
-    rotatedModels.push(moved);
+  const rotationKey = comboName || "__default__";
+  const normalizedStickyLimit = normalizeStickyLimit(stickyLimit);
+  const existingState = comboRotationState.get(rotationKey);
+  const state = typeof existingState === "number"
+    ? { index: existingState, consecutiveUseCount: 0 }
+    : (existingState || { index: 0, consecutiveUseCount: 0 });
+
+  const currentIndex = state.index % models.length;
+  const rotatedModels = rotateModelsFromIndex(models, currentIndex);
+  const nextUseCount = state.consecutiveUseCount + 1;
+
+  if (nextUseCount >= normalizedStickyLimit) {
+    comboRotationState.set(rotationKey, {
+      index: (currentIndex + 1) % models.length,
+      consecutiveUseCount: 0,
+    });
+  } else {
+    comboRotationState.set(rotationKey, {
+      index: currentIndex,
+      consecutiveUseCount: nextUseCount,
+    });
   }
-  
-  // Update state for next request (cycle through all models)
-  const nextIndex = (currentIndex + 1) % models.length;
-  comboRotationState.set(comboName, nextIndex);
-  
+
   return rotatedModels;
 }
 
@@ -77,28 +177,30 @@ export function getComboModelsFromData(modelStr, combosData) {
  * @param {Object} options.log - Logger object
  * @param {string} [options.comboName] - Name of the combo (for round-robin tracking)
  * @param {string} [options.comboStrategy] - Strategy: "fallback" or "round-robin"
- * @param {number} [options.comboTimeoutMs=60000] - Overall timeout in ms for all model attempts
+ * @param {number|string} [options.comboStickyLimit=1] - Requests per combo model before switching
  * @returns {Promise<Response>}
  */
-export async function handleComboChat({ body, models, handleSingleModel, log, comboName, comboStrategy, comboTimeoutMs = 60000 }) {
+export async function handleComboChat({ body, models, handleSingleModel, log, comboName, comboStrategy, comboStickyLimit = 1, autoSwitch = true }) {
   // Apply rotation strategy if enabled
-  const rotatedModels = getRotatedModels(models, comboName, comboStrategy);
-  const startTime = Date.now();
+  let rotatedModels = getRotatedModels(models, comboName, comboStrategy, comboStickyLimit);
+
+  // Auto-switch: float models that satisfy the request's required capabilities to the front.
+  if (autoSwitch) {
+    const required = detectRequiredCapabilities(body);
+    if (required.size > 0) {
+      const reordered = reorderByCapabilities(rotatedModels, required);
+      if (reordered[0] !== rotatedModels[0]) {
+        log.info("COMBO", `auto-switch for [${[...required].join(",")}] → ${reordered[0]}`);
+      }
+      rotatedModels = reordered;
+    }
+  }
   
   let lastError = null;
   let earliestRetryAfter = null;
   let lastStatus = null;
 
   for (let i = 0; i < rotatedModels.length; i++) {
-    // Check overall timeout before trying next model
-    const elapsed = Date.now() - startTime;
-    if (elapsed >= comboTimeoutMs) {
-      log.warn("COMBO", `Overall timeout reached (${comboTimeoutMs}ms) after ${i} models`);
-      return new Response(
-        JSON.stringify({ error: { message: `Combo timeout: ${elapsed}ms exceeded ${comboTimeoutMs}ms limit` } }),
-        { status: 504, headers: { "Content-Type": "application/json" } }
-      );
-    }
     const modelStr = rotatedModels[i];
     log.info("COMBO", `Trying model ${i + 1}/${rotatedModels.length}: ${modelStr}`);
 

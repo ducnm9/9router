@@ -8,8 +8,7 @@ import {
   isValidApiKey,
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
-import { getSettings, getApiKeyByValue } from "@/lib/localDb";
-import { getCounter, checkQuota } from "@/lib/quotaDb";
+import { getSettings } from "@/lib/localDb";
 import { getModelInfo, getComboModels } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
 import { errorResponse, unavailableResponse } from "open-sse/utils/error.js";
@@ -20,29 +19,6 @@ import { detectFormatByEndpoint } from "open-sse/translator/formats.js";
 import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
-
-/**
- * Add quota warning headers to a response if quota warning is active.
- */
-function addQuotaHeaders(response, request) {
-  const warning = request?.__quotaWarning;
-  if (!warning || !response) return response;
-
-  // Create new response with same body/status but additional headers
-  const newHeaders = new Headers(response.headers);
-  newHeaders.set("X-Quota-Warning", "true");
-  newHeaders.set("X-Quota-Tokens-Used", String(warning.tokensUsed));
-  newHeaders.set("X-Quota-Tokens-Limit", String(warning.tokensLimit || "unlimited"));
-  newHeaders.set("X-Quota-Cost-Used", String(warning.costUsed));
-  newHeaders.set("X-Quota-Cost-Limit", String(warning.costLimit || "unlimited"));
-  newHeaders.set("X-Quota-Reset", warning.resetsAt);
-
-  return new Response(response.body, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: newHeaders,
-  });
-}
 
 /**
  * Handle chat completion request
@@ -103,61 +79,6 @@ export async function handleChat(request, clientRawRequest = null) {
     }
   }
 
-  // --- Quota Check ---
-  if (apiKey) {
-    try {
-      const keyConfig = await getApiKeyByValue(apiKey);
-      if (keyConfig?.quota) {
-        const counter = await getCounter(keyConfig.id);
-        const quotaResult = checkQuota(counter, keyConfig.quota);
-
-        if (!quotaResult.allowed) {
-          const tokensDisplay = quotaResult.limit.maxTokens
-            ? `${quotaResult.usage.totalTokens.toLocaleString()}/${quotaResult.limit.maxTokens.toLocaleString()}`
-            : "N/A";
-          log.warn("QUOTA", `Key ${log.maskKey(apiKey)} exceeded quota: ${tokensDisplay}`);
-          return new Response(
-            JSON.stringify({
-              error: {
-                type: "quota_exceeded",
-                message: `API key quota exceeded. Token usage: ${tokensDisplay}. Resets on ${new Date(quotaResult.resetsAt).toISOString().slice(0, 10)}.`,
-                code: "quota_exceeded",
-                quota: {
-                  tokens: {
-                    used: quotaResult.usage.totalTokens,
-                    limit: quotaResult.limit.maxTokens,
-                  },
-                  cost: {
-                    used: quotaResult.usage.totalCost,
-                    limit: quotaResult.limit.maxCost,
-                  },
-                  resetsAt: quotaResult.resetsAt,
-                },
-              },
-            }),
-            { status: 429, headers: { "Content-Type": "application/json" } }
-          );
-        }
-
-        // Store quota warning info for response headers (Task 7 will use this)
-        if (quotaResult.warning) {
-          request.__quotaWarning = {
-            tokensUsed: quotaResult.usage.totalTokens,
-            tokensLimit: quotaResult.limit.maxTokens,
-            costUsed: quotaResult.usage.totalCost,
-            costLimit: quotaResult.limit.maxCost,
-            resetsAt: quotaResult.resetsAt,
-          };
-        }
-
-        // Store keyId for post-request increment (Task 4 will use this)
-        request.__quotaKeyId = keyConfig.id;
-      }
-    } catch (quotaErr) {
-      log.warn("QUOTA", `Quota check failed (fail-open): ${quotaErr.message}`);
-    }
-  }
-
   if (!modelStr) {
     log.warn("CHAT", "Missing model");
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
@@ -176,22 +97,21 @@ export async function handleChat(request, clientRawRequest = null) {
     const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
     const comboStrategy = comboSpecificStrategy || settings.comboStrategy || "fallback";
     
-    log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy})`);
-    const comboResponse = await handleComboChat({
+    const comboStickyLimit = settings.comboStickyRoundRobinLimit;
+    log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
+    return handleComboChat({
       body,
       models: comboModels,
       handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
       log,
       comboName: modelStr,
       comboStrategy,
-      comboTimeoutMs: settings.comboTimeoutMs || 60000
+      comboStickyLimit
     });
-    return addQuotaHeaders(comboResponse, request);
   }
 
   // Single model request
-  const singleResponse = await handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
-  return addQuotaHeaders(singleResponse, request);
+  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
 }
 
 /**
@@ -210,7 +130,8 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
       const comboStrategy = comboSpecificStrategy || chatSettings.comboStrategy || "fallback";
       
-      log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy})`);
+      const comboStickyLimit = chatSettings.comboStickyRoundRobinLimit;
+      log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy}, sticky: ${comboStickyLimit})`);
       return handleComboChat({
         body,
         models: comboModels,
@@ -218,7 +139,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
         log,
         comboName: modelStr,
         comboStrategy,
-        comboTimeoutMs: chatSettings.comboTimeoutMs || 60000
+        comboStickyLimit
       });
     }
     log.warn("CHAT", "Invalid model format", { model: modelStr });
@@ -297,9 +218,8 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       sourceFormatOverride: request?.url ? detectFormatByEndpoint(new URL(request.url).pathname, body) : null,
       onCredentialsRefreshed: async (newCreds) => {
         await updateProviderCredentials(credentials.connectionId, {
-          accessToken: newCreds.accessToken,
-          refreshToken: newCreds.refreshToken,
-          providerSpecificData: newCreds.providerSpecificData,
+          ...newCreds,
+          existingProviderSpecificData: credentials.providerSpecificData,
           testStatus: "active"
         });
       },

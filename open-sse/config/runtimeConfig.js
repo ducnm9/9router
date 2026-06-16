@@ -31,13 +31,11 @@ export const MEMORY_CONFIG = {
   proxyDispatchersMaxSize: 20,
 };
 
-// Upstream connection config (to prevent socket closed unexpectedly)
-export const UPSTREAM_CONFIG = {
-  // Socket timeout for waiting initial response (10 minutes — long thinking models like Claude/o1)
-  socketTimeoutMs: 10 * 60 * 1000,
-  // Retry on socket/connection errors (not HTTP errors)
-  socketRetry: { attempts: 2, delayMs: 1000 },
-};
+// Stream stall timeout: abort if no chunk received within this duration
+export const STREAM_STALL_TIMEOUT_MS = 60 * 1000;
+
+// Fetch connect timeout: abort if upstream doesn't return response headers within this duration
+export const FETCH_CONNECT_TIMEOUT_MS = 60 * 1000;
 
 // Default token limits
 export const DEFAULT_MAX_TOKENS = 64000;
