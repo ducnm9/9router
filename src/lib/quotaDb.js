@@ -162,7 +162,7 @@ export function getAllCounters() {
  * Check if a counter is within quota limits.
  * @param {{ totalTokens: number, totalCost: number }} counter
  * @param {{ maxTokens?: number|null, maxCost?: number|null, warningThreshold?: number }|null} quota
- * @returns {{ allowed: boolean, warning: boolean, usage?: number, limit?: number, resetsAt?: string }}
+ * @returns {{ allowed: boolean, warning: boolean, usage?: {totalTokens: number, totalCost: number}, limit?: {maxTokens: number|null, maxCost: number|null}, resetsAt?: string }}
  */
 export function checkQuota(counter, quota) {
   // No quota configured → unlimited
@@ -171,17 +171,15 @@ export function checkQuota(counter, quota) {
   }
 
   const resetsAt = getNextResetDate();
+  const usage = { totalTokens: counter.totalTokens, totalCost: counter.totalCost };
+  const limit = { maxTokens: quota.maxTokens, maxCost: quota.maxCost };
 
   // Check if exceeded
   const tokensExceeded = quota.maxTokens != null && counter.totalTokens >= quota.maxTokens;
   const costExceeded = quota.maxCost != null && counter.totalCost >= quota.maxCost;
 
   if (tokensExceeded || costExceeded) {
-    // Report the dimension that exceeded
-    if (tokensExceeded) {
-      return { allowed: false, warning: false, usage: counter.totalTokens, limit: quota.maxTokens, resetsAt };
-    }
-    return { allowed: false, warning: false, usage: counter.totalCost, limit: quota.maxCost, resetsAt };
+    return { allowed: false, warning: false, usage, limit, resetsAt };
   }
 
   // Check warning threshold
@@ -189,35 +187,13 @@ export function checkQuota(counter, quota) {
   let warning = false;
 
   if (quota.maxTokens != null && quota.maxTokens > 0) {
-    const tokenRatio = counter.totalTokens / quota.maxTokens;
-    if (tokenRatio >= threshold) warning = true;
+    if (counter.totalTokens / quota.maxTokens >= threshold) warning = true;
   }
-
   if (quota.maxCost != null && quota.maxCost > 0) {
-    const costRatio = counter.totalCost / quota.maxCost;
-    if (costRatio >= threshold) warning = true;
+    if (counter.totalCost / quota.maxCost >= threshold) warning = true;
   }
 
   if (warning) {
-    // Report the highest ratio dimension
-    let usage, limit;
-    if (quota.maxTokens != null && quota.maxCost != null) {
-      const tokenRatio = counter.totalTokens / quota.maxTokens;
-      const costRatio = counter.totalCost / quota.maxCost;
-      if (tokenRatio >= costRatio) {
-        usage = counter.totalTokens;
-        limit = quota.maxTokens;
-      } else {
-        usage = counter.totalCost;
-        limit = quota.maxCost;
-      }
-    } else if (quota.maxTokens != null) {
-      usage = counter.totalTokens;
-      limit = quota.maxTokens;
-    } else {
-      usage = counter.totalCost;
-      limit = quota.maxCost;
-    }
     return { allowed: true, warning: true, usage, limit, resetsAt };
   }
 

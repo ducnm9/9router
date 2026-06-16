@@ -8,7 +8,8 @@ import {
   isValidApiKey,
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
-import { getSettings } from "@/lib/localDb";
+import { getSettings, getApiKeyByValue } from "@/lib/localDb";
+import { getCounter, checkQuota } from "@/lib/quotaDb";
 import { getModelInfo, getComboModels } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
 import { errorResponse, unavailableResponse } from "open-sse/utils/error.js";
@@ -76,6 +77,61 @@ export async function handleChat(request, clientRawRequest = null) {
     if (!valid) {
       log.warn("AUTH", "Invalid API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
+    }
+  }
+
+  // --- Quota Check ---
+  if (apiKey) {
+    try {
+      const keyConfig = await getApiKeyByValue(apiKey);
+      if (keyConfig?.quota) {
+        const counter = await getCounter(keyConfig.id);
+        const quotaResult = checkQuota(counter, keyConfig.quota);
+
+        if (!quotaResult.allowed) {
+          const tokensDisplay = quotaResult.limit.maxTokens
+            ? `${quotaResult.usage.totalTokens.toLocaleString()}/${quotaResult.limit.maxTokens.toLocaleString()}`
+            : "N/A";
+          log.warn("QUOTA", `Key ${log.maskKey(apiKey)} exceeded quota: ${tokensDisplay}`);
+          return new Response(
+            JSON.stringify({
+              error: {
+                type: "quota_exceeded",
+                message: `API key quota exceeded. Token usage: ${tokensDisplay}. Resets on ${new Date(quotaResult.resetsAt).toISOString().slice(0, 10)}.`,
+                code: "quota_exceeded",
+                quota: {
+                  tokens: {
+                    used: quotaResult.usage.totalTokens,
+                    limit: quotaResult.limit.maxTokens,
+                  },
+                  cost: {
+                    used: quotaResult.usage.totalCost,
+                    limit: quotaResult.limit.maxCost,
+                  },
+                  resetsAt: quotaResult.resetsAt,
+                },
+              },
+            }),
+            { status: 429, headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        // Store quota warning info for response headers (Task 7 will use this)
+        if (quotaResult.warning) {
+          request.__quotaWarning = {
+            tokensUsed: quotaResult.usage.totalTokens,
+            tokensLimit: quotaResult.limit.maxTokens,
+            costUsed: quotaResult.usage.totalCost,
+            costLimit: quotaResult.limit.maxCost,
+            resetsAt: quotaResult.resetsAt,
+          };
+        }
+
+        // Store keyId for post-request increment (Task 4 will use this)
+        request.__quotaKeyId = keyConfig.id;
+      }
+    } catch (quotaErr) {
+      log.warn("QUOTA", `Quota check failed (fail-open): ${quotaErr.message}`);
     }
   }
 

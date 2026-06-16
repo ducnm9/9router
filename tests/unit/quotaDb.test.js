@@ -218,8 +218,8 @@ describe("quotaDb", () => {
       const result = checkQuota(counter, quota);
       expect(result.allowed).toBe(true);
       expect(result.warning).toBe(true);
-      expect(result.usage).toBe(85000);
-      expect(result.limit).toBe(100000);
+      expect(result.usage.totalTokens).toBe(85000);
+      expect(result.limit.maxTokens).toBe(100000);
       expect(result.resetsAt).toBeDefined();
     });
 
@@ -228,8 +228,8 @@ describe("quotaDb", () => {
       const quota = { maxTokens: 100000, maxCost: 10.0, warningThreshold: 0.8 };
       const result = checkQuota(counter, quota);
       expect(result.allowed).toBe(false);
-      expect(result.usage).toBe(100000);
-      expect(result.limit).toBe(100000);
+      expect(result.usage.totalTokens).toBe(100000);
+      expect(result.limit.maxTokens).toBe(100000);
       expect(result.resetsAt).toBeDefined();
     });
 
@@ -238,8 +238,8 @@ describe("quotaDb", () => {
       const quota = { maxTokens: 100000, maxCost: 10.0, warningThreshold: 0.8 };
       const result = checkQuota(counter, quota);
       expect(result.allowed).toBe(false);
-      expect(result.usage).toBe(10.0);
-      expect(result.limit).toBe(10.0);
+      expect(result.usage.totalCost).toBe(10.0);
+      expect(result.limit.maxCost).toBe(10.0);
     });
 
     it("returns allowed=true for null quota (unlimited)", () => {
@@ -280,8 +280,8 @@ describe("quotaDb", () => {
       const quota = { maxTokens: 100000, maxCost: null, warningThreshold: 0.8 };
       const result = checkQuota(counter, quota);
       expect(result.allowed).toBe(false);
-      expect(result.usage).toBe(100000);
-      expect(result.limit).toBe(100000);
+      expect(result.usage.totalTokens).toBe(100000);
+      expect(result.limit.maxTokens).toBe(100000);
     });
 
     it("blocks when only cost limit is set and exceeded", () => {
@@ -289,8 +289,8 @@ describe("quotaDb", () => {
       const quota = { maxTokens: null, maxCost: 10.0, warningThreshold: 0.8 };
       const result = checkQuota(counter, quota);
       expect(result.allowed).toBe(false);
-      expect(result.usage).toBe(10.0);
-      expect(result.limit).toBe(10.0);
+      expect(result.usage.totalCost).toBe(10.0);
+      expect(result.limit.maxCost).toBe(10.0);
     });
 
     it("uses default warningThreshold of 0.8 when not specified", () => {
