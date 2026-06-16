@@ -85,9 +85,7 @@ export async function handleChat(request, clientRawRequest = null) {
     const keyRecord = await getApiKeyByValue(apiKey);
     if (keyRecord && isKeyExpired(keyRecord)) {
       log.warn("AUTH", "Expired API key");
-      return new Response(JSON.stringify({
-        error: { message: "API key has expired", type: "authentication_error", code: "key_expired" }
-      }), { status: 401, headers: { "Content-Type": "application/json" } });
+      return errorResponse(HTTP_STATUS.UNAUTHORIZED, "API key has expired");
     }
   }
 

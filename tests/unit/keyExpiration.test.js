@@ -30,4 +30,23 @@ describe('API Key Expiration', () => {
     const status = getExpirationStatus({ expiresAt: inFiveDays });
     expect(status.warning).toBe(true);
   });
+
+  it('returns false for malformed date string', () => {
+    expect(isKeyExpired({ expiresAt: 'not-a-date' })).toBe(false);
+    // empty string is falsy, so !key.expiresAt short-circuits to false
+    expect(isKeyExpired({ expiresAt: '' })).toBe(false);
+  });
+
+  it('getExpirationStatus returns expired:true for past date', () => {
+    const past = new Date(Date.now() - 1000).toISOString();
+    const status = getExpirationStatus({ expiresAt: past });
+    expect(status.expired).toBe(true);
+    expect(status.warning).toBe(false);
+  });
+
+  it('getExpirationStatus flags warning at exactly 7 days boundary', () => {
+    const sevenDays = new Date(Date.now() + 7 * 86400000).toISOString();
+    const status = getExpirationStatus({ expiresAt: sevenDays });
+    expect(status.warning).toBe(true);
+  });
 });

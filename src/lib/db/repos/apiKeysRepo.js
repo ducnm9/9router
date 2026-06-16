@@ -33,6 +33,13 @@ export async function getApiKeyById(id) {
 
 export async function createApiKey(name, machineId, { expiresAt = null } = {}) {
   if (!machineId) throw new Error("machineId is required");
+  // Validate expiresAt if provided
+  if (expiresAt != null) {
+    const d = new Date(expiresAt);
+    if (isNaN(d.getTime())) {
+      throw new Error('Invalid expiresAt date format. Use ISO 8601.');
+    }
+  }
   const db = await getAdapter();
   const { generateApiKeyWithMachine } = await import("@/shared/utils/apiKey");
   const result = generateApiKeyWithMachine(machineId);
@@ -53,6 +60,13 @@ export async function createApiKey(name, machineId, { expiresAt = null } = {}) {
 }
 
 export async function updateApiKey(id, data) {
+  // Validate expiresAt if provided
+  if (data.expiresAt != null) {
+    const d = new Date(data.expiresAt);
+    if (isNaN(d.getTime())) {
+      throw new Error('Invalid expiresAt date format. Use ISO 8601.');
+    }
+  }
   const db = await getAdapter();
   let result = null;
   db.transaction(() => {
@@ -91,18 +105,22 @@ export async function getApiKeyByValue(key) {
 
 export function isKeyExpired(key) {
   if (!key.expiresAt) return false;
-  return new Date(key.expiresAt) <= new Date();
+  const d = new Date(key.expiresAt);
+  if (isNaN(d.getTime())) return false; // malformed date = treat as no expiry
+  return d <= new Date();
 }
 
 export function getExpirationStatus(key) {
   if (!key.expiresAt) {
     return { expired: false, warning: false, daysRemaining: null, expiresAt: null };
   }
-  const now = new Date();
   const expires = new Date(key.expiresAt);
+  if (isNaN(expires.getTime())) {
+    return { expired: false, warning: false, daysRemaining: null, expiresAt: key.expiresAt, malformed: true };
+  }
+  const now = new Date();
   const msRemaining = expires - now;
   const daysRemaining = Math.floor(msRemaining / 86400000);
-
   return {
     expired: msRemaining <= 0,
     warning: daysRemaining <= 7 && daysRemaining > 0,
