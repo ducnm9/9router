@@ -24,10 +24,9 @@ export default function Card({
   return (
     <div
       className={cn(
-        "bg-surface",
-        "border border-black/5 dark:border-white/5",
-        "rounded-lg shadow-sm",
-        hover && "hover:shadow-md hover:border-primary/30 transition-all cursor-pointer",
+        "glass rounded-2xl",
+        "transition-all duration-300",
+        hover && "hover:glow-md hover:border-[var(--glass-border-hover)] hover:-translate-y-0.5 cursor-pointer",
         paddings[padding],
         className
       )}
@@ -63,9 +62,9 @@ Card.Section = function CardSection({ children, className, ...props }) {
   return (
     <div
       className={cn(
-        "p-4 rounded-lg",
-        "bg-black/[0.02] dark:bg-white/[0.02]",
-        "border border-black/5 dark:border-white/5",
+        "p-4 rounded-xl",
+        "bg-white/5 dark:bg-white/[0.03]",
+        "border border-[var(--glass-border)]",
         className
       )}
       {...props}
