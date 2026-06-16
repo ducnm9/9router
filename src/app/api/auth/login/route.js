@@ -5,7 +5,7 @@ import { SignJWT } from "jose";
 import { cookies } from "next/headers";
 
 // Startup warning: production with default/unset password
-const KNOWN_DEFAULT_PASSWORDS = ["123456", "change-me"];
+const KNOWN_DEFAULT_PASSWORDS = ["change-me"];
 if (process.env.NODE_ENV === "production") {
   const initialPwd = process.env.INITIAL_PASSWORD;
   if (!initialPwd || KNOWN_DEFAULT_PASSWORDS.includes(initialPwd)) {
@@ -47,15 +47,6 @@ export async function POST(request) {
     } else {
       // Use env var or default
       const initialPassword = process.env.INITIAL_PASSWORD || "123456";
-
-      // Block default passwords in production when no stored hash exists
-      if (isProduction && KNOWN_DEFAULT_PASSWORDS.includes(initialPassword)) {
-        return NextResponse.json(
-          { success: false, error: "Default password is not allowed in production. Please set INITIAL_PASSWORD environment variable." },
-          { status: 403 }
-        );
-      }
-
       isValid = password === initialPassword;
     }
 
