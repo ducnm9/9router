@@ -26,6 +26,7 @@ export default function APIPageClient({ machineId }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
   const [newKeyQuota, setNewKeyQuota] = useState({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
+  const [newKeyExpiry, setNewKeyExpiry] = useState("");
   const [createdKey, setCreatedKey] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
 
@@ -692,10 +693,14 @@ export default function APIPageClient({ machineId }) {
     if (!newKeyName.trim()) return;
 
     try {
+      const expiresAt = newKeyExpiry
+        ? new Date(Date.now() + parseInt(newKeyExpiry) * 86400000).toISOString()
+        : null;
+
       const res = await fetch("/api/keys", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newKeyName }),
+        body: JSON.stringify({ name: newKeyName, expiresAt }),
       });
       const data = await res.json();
 
@@ -719,6 +724,7 @@ export default function APIPageClient({ machineId }) {
         await fetchData();
         setNewKeyName("");
         setNewKeyQuota({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
+        setNewKeyExpiry("");
         setShowAddModal(false);
       }
     } catch (error) {
@@ -1221,7 +1227,22 @@ export default function APIPageClient({ machineId }) {
                 className={`group flex items-center justify-between py-3 border-b border-black/[0.03] dark:border-white/[0.03] last:border-b-0 ${key.isActive === false ? "opacity-60" : ""}`}
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{key.name}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-medium">{key.name}</p>
+                    {key.expiresAt && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                        new Date(key.expiresAt) <= new Date()
+                          ? "bg-error/10 text-error"
+                          : new Date(key.expiresAt) <= new Date(Date.now() + 7 * 86400000)
+                          ? "bg-warning/10 text-warning"
+                          : "bg-success/10 text-success"
+                      }`}>
+                        {new Date(key.expiresAt) <= new Date()
+                          ? "Expired"
+                          : `Exp ${new Date(key.expiresAt).toLocaleDateString()}`}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <code className="text-xs text-text-muted font-mono">
                       {visibleKeys.has(key.id) ? key.key : maskKey(key.key)}
@@ -1328,6 +1349,7 @@ export default function APIPageClient({ machineId }) {
           setShowAddModal(false);
           setNewKeyName("");
           setNewKeyQuota({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
+          setNewKeyExpiry("");
         }}
       >
         <div className="flex flex-col gap-4">
@@ -1337,6 +1359,21 @@ export default function APIPageClient({ machineId }) {
             onChange={(e) => setNewKeyName(e.target.value)}
             placeholder="Production Key"
           />
+          <div>
+            <label className="block text-sm font-medium mb-1">Expires in</label>
+            <select
+              value={newKeyExpiry}
+              onChange={(e) => setNewKeyExpiry(e.target.value)}
+              className="w-full px-3 py-2 border rounded-md bg-surface-secondary border-border text-sm"
+            >
+              <option value="">Never</option>
+              <option value="7">7 days</option>
+              <option value="30">30 days</option>
+              <option value="90">90 days</option>
+              <option value="180">180 days</option>
+              <option value="365">1 year</option>
+            </select>
+          </div>
           <div className="border-t border-border pt-3">
             <p className="text-xs text-text-muted mb-3">Quota Limits (optional)</p>
             <div className="flex flex-col gap-3">
@@ -1376,6 +1413,7 @@ export default function APIPageClient({ machineId }) {
                 setShowAddModal(false);
                 setNewKeyName("");
                 setNewKeyQuota({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
+                setNewKeyExpiry("");
               }}
               variant="ghost"
               fullWidth

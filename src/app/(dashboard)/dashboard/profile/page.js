@@ -60,6 +60,15 @@ export default function ProfilePage() {
   const [proxyLoading, setProxyLoading] = useState(false);
   const [proxyTestLoading, setProxyTestLoading] = useState(false);
 
+  // Rate Limiting
+  const [rateLimitEnabled, setRateLimitEnabled] = useState(false);
+  const [rateLimitPerKey, setRateLimitPerKey] = useState(60);
+  const [rateLimitPerIp, setRateLimitPerIp] = useState(120);
+
+  // Notifications
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [notificationChannels, setNotificationChannels] = useState([]);
+
   useEffect(() => {
     setLocale(getLocaleFromCookie());
   }, [langOpen]);
@@ -83,12 +92,25 @@ export default function ProfilePage() {
           outboundProxyUrl: data?.outboundProxyUrl || "",
           outboundNoProxy: data?.outboundNoProxy || "",
         });
+        setRateLimitEnabled(data?.rateLimitEnabled ?? false);
+        setRateLimitPerKey(data?.rateLimitPerKey ?? 60);
+        setRateLimitPerIp(data?.rateLimitPerIp ?? 120);
         setLoading(false);
       })
       .catch((err) => {
         console.error("Failed to fetch settings:", err);
         setLoading(false);
       });
+
+    fetch("/api/settings/notifications")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data) {
+          setNotificationsEnabled(data.enabled ?? false);
+          setNotificationChannels(data.channels || []);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -553,6 +575,70 @@ export default function ProfilePage() {
   };
 
   const observabilityEnabled = settings.enableObservability === true;
+
+  const handleSettingChange = async (key, value) => {
+    try {
+      const res = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [key]: value }),
+      });
+      if (res.ok) {
+        if (key === "rateLimitEnabled") setRateLimitEnabled(value);
+        if (key === "rateLimitPerKey") setRateLimitPerKey(value);
+        if (key === "rateLimitPerIp") setRateLimitPerIp(value);
+      }
+    } catch (err) {
+      console.error("Failed to update setting:", err);
+    }
+  };
+
+  const handleNotificationsEnabled = async (v) => {
+    setNotificationsEnabled(v);
+    try {
+      await fetch("/api/settings/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: v, channels: notificationChannels }),
+      });
+    } catch (err) {
+      console.error("Failed to update notifications:", err);
+    }
+  };
+
+  const addChannel = () => setNotificationChannels(prev => [...prev, { type: "webhook", url: "" }]);
+  const removeChannel = (i) => setNotificationChannels(prev => prev.filter((_, idx) => idx !== i));
+  const updateChannel = (i, key, val) => setNotificationChannels(prev => {
+    const next = [...prev];
+    next[i] = { ...next[i], [key]: val };
+    return next;
+  });
+
+  const saveNotificationChannels = async () => {
+    try {
+      await fetch("/api/settings/notifications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: notificationsEnabled, channels: notificationChannels }),
+      });
+    } catch (err) {
+      console.error("Failed to save notification channels:", err);
+    }
+  };
+
+  const testChannel = async (i) => {
+    const ch = notificationChannels[i];
+    if (!ch?.url) return;
+    try {
+      await fetch("/api/settings/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel: ch }),
+      });
+    } catch (err) {
+      console.error("Failed to test channel:", err);
+    }
+  };
 
   const handleShutdown = async () => {
     setIsShuttingDown(true);
@@ -1102,6 +1188,134 @@ export default function ProfilePage() {
               disabled={loading}
             />
           </div>
+        </Card>
+
+        {/* Rate Limiting Section */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+              <span className="material-symbols-outlined text-[20px]">speed</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold">Rate Limiting</h3>
+          </div>
+
+          <div className="flex items-start sm:items-center justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm sm:text-base">Enable Rate Limiting</p>
+              <p className="text-xs sm:text-sm text-text-muted">Limit requests per minute per API key and per IP address</p>
+            </div>
+            <Toggle
+              checked={rateLimitEnabled}
+              onChange={(v) => handleSettingChange("rateLimitEnabled", v)}
+              disabled={loading}
+            />
+          </div>
+
+          {rateLimitEnabled && (
+            <div className="flex flex-col gap-3 mt-2">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">Requests per minute (per API key)</p>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={rateLimitPerKey}
+                  onChange={(e) => setRateLimitPerKey(Number(e.target.value))}
+                  onBlur={() => handleSettingChange("rateLimitPerKey", rateLimitPerKey)}
+                  className="w-24 px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
+                />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">Requests per minute (per IP)</p>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="10000"
+                  value={rateLimitPerIp}
+                  onChange={(e) => setRateLimitPerIp(Number(e.target.value))}
+                  onBlur={() => handleSettingChange("rateLimitPerIp", rateLimitPerIp)}
+                  className="w-24 px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
+                />
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Notifications Section */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+              <span className="material-symbols-outlined text-[20px]">notifications</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold">Notifications</h3>
+          </div>
+
+          <div className="flex items-start sm:items-center justify-between gap-4 mb-4">
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm sm:text-base">Enable Notifications</p>
+              <p className="text-xs sm:text-sm text-text-muted">Send alerts when quota is warning or exceeded</p>
+            </div>
+            <Toggle
+              checked={notificationsEnabled}
+              onChange={(v) => handleNotificationsEnabled(v)}
+              disabled={loading}
+            />
+          </div>
+
+          {notificationsEnabled && (
+            <div className="flex flex-col gap-3">
+              {notificationChannels.map((ch, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select
+                    value={ch.type || "webhook"}
+                    onChange={(e) => updateChannel(i, "type", e.target.value)}
+                    className="px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
+                  >
+                    <option value="webhook">Webhook</option>
+                    <option value="slack">Slack</option>
+                    <option value="discord">Discord</option>
+                    <option value="telegram">Telegram</option>
+                  </select>
+                  <input
+                    type="url"
+                    placeholder="Webhook URL"
+                    value={ch.url || ""}
+                    onChange={(e) => updateChannel(i, "url", e.target.value)}
+                    className="flex-1 px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
+                  />
+                  <button
+                    onClick={() => testChannel(i)}
+                    className="px-2 py-1 text-xs border rounded-md hover:bg-surface-hover"
+                    title="Test"
+                  >Test</button>
+                  <button
+                    onClick={() => removeChannel(i)}
+                    className="p-1 text-error hover:bg-error/10 rounded"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-2 mt-1">
+                <button
+                  onClick={addChannel}
+                  className="px-3 py-1 text-sm border rounded-md hover:bg-surface-hover"
+                >
+                  + Add Channel
+                </button>
+                <button
+                  onClick={saveNotificationChannels}
+                  className="px-3 py-1 text-sm bg-primary text-white rounded-md hover:bg-primary/90"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          )}
         </Card>
 
         {/* Account actions */}
