@@ -334,4 +334,25 @@ export function logUsage(provider, usage, model = null, connectionId = null, api
   };
   saveRequestUsage({ model, provider, connectionId, tokens, apiKey: apiKey || undefined }).catch(() => { });
   appendRequestLog({ model, provider, connectionId, tokens, status: "200 OK" }).catch(() => { });
+
+  // --- Quota counter increment ---
+  if (apiKey) {
+    (async () => {
+      try {
+        const { getApiKeyByValue } = await import("../../src/lib/localDb.js");
+        const { incrementCounter } = await import("../../src/lib/quotaDb.js");
+        const { calculateCost } = await import("../../src/lib/usageDb.js");
+
+        const keyConfig = await getApiKeyByValue(apiKey);
+        if (keyConfig?.quota) {
+          const totalTokens = inTokens + outTokens;
+          const cost = calculateCost(provider, model, tokens) || 0;
+          await incrementCounter(keyConfig.id, { tokens: totalTokens, cost });
+        }
+      } catch (e) {
+        // Don't let quota tracking failure break anything
+        console.error("[Quota] Failed to increment counter:", e.message);
+      }
+    })();
+  }
 }
