@@ -77,7 +77,7 @@ export default function Sidebar({ onClose }) {
 
   return (
     <>
-      <aside className="flex w-72 flex-col border-r border-black/5 dark:border-white/5 bg-vibrancy backdrop-blur-xl transition-colors duration-300 min-h-full">
+      <aside className="flex w-72 flex-col glass-strong rounded-none sm:rounded-r-2xl transition-all duration-300 min-h-full glow-sm animate-glow-pulse">
         {/* Traffic lights */}
         <div className="flex items-center gap-2 px-6 pt-5 pb-2">
           <div className="w-3 h-3 rounded-full bg-[#FF5F56]" />
@@ -109,7 +109,7 @@ export default function Sidebar({ onClose }) {
               className={cn(
                 "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
                 isActive(item.href)
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary/15 dark:bg-primary/20 text-primary border border-primary/25 shadow-[0_0_8px_var(--glow-primary)]"
                   : "text-text-muted hover:bg-surface/50 hover:text-text-main"
               )}
             >
@@ -137,7 +137,7 @@ export default function Sidebar({ onClose }) {
               className={cn(
                 "w-full flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
                 pathname.startsWith("/dashboard/media-providers")
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary/15 dark:bg-primary/20 text-primary border border-primary/25 shadow-[0_0_8px_var(--glow-primary)]"
                   : "text-text-muted hover:bg-surface/50 hover:text-text-main"
               )}
             >
@@ -157,7 +157,7 @@ export default function Sidebar({ onClose }) {
                     className={cn(
                       "flex items-center gap-3 px-4 py-1.5 rounded-lg transition-all group",
                       pathname.startsWith(`/dashboard/media-providers/${kind.id}`)
-                        ? "bg-primary/10 text-primary"
+                        ? "bg-primary/15 dark:bg-primary/20 text-primary border border-primary/25 shadow-[0_0_8px_var(--glow-primary)]"
                         : "text-text-muted hover:bg-surface/50 hover:text-text-main"
                     )}
                   >
@@ -172,7 +172,7 @@ export default function Sidebar({ onClose }) {
                   className={cn(
                     "flex items-center gap-3 px-4 py-1.5 rounded-lg transition-all group",
                     pathname.startsWith(COMBINED_WEB_ITEM.href)
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary/15 dark:bg-primary/20 text-primary border border-primary/25 shadow-[0_0_8px_var(--glow-primary)]"
                       : "text-text-muted hover:bg-surface/50 hover:text-text-main"
                   )}
                 >
@@ -190,7 +190,7 @@ export default function Sidebar({ onClose }) {
                 className={cn(
                   "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
                   isActive(item.href)
-                    ? "bg-primary/10 text-primary"
+                    ? "bg-primary/15 dark:bg-primary/20 text-primary border border-primary/25 shadow-[0_0_8px_var(--glow-primary)]"
                     : "text-text-muted hover:bg-surface/50 hover:text-text-main"
                 )}
               >
@@ -217,7 +217,7 @@ export default function Sidebar({ onClose }) {
                   className={cn(
                     "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
                     isActive(item.href)
-                      ? "bg-primary/10 text-primary"
+                      ? "bg-primary/15 dark:bg-primary/20 text-primary border border-primary/25 shadow-[0_0_8px_var(--glow-primary)]"
                       : "text-text-muted hover:bg-surface/50 hover:text-text-main"
                   )}
                 >
@@ -241,7 +241,7 @@ export default function Sidebar({ onClose }) {
               className={cn(
                 "flex items-center gap-3 px-4 py-2 rounded-lg transition-all group",
                 isActive("/dashboard/profile")
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary/15 dark:bg-primary/20 text-primary border border-primary/25 shadow-[0_0_8px_var(--glow-primary)]"
                   : "text-text-muted hover:bg-surface/50 hover:text-text-main"
               )}
             >
