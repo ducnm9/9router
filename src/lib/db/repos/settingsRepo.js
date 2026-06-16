@@ -36,6 +36,9 @@ const DEFAULT_SETTINGS = {
   rtkEnabled: true,
   cavemanEnabled: false,
   cavemanLevel: "full",
+  rateLimitEnabled: false,
+  rateLimitPerKey: 60,
+  rateLimitPerIp: 120,
 };
 
 async function readRaw() {

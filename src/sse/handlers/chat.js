@@ -9,6 +9,7 @@ import {
 } from "../services/auth.js";
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings, getApiKeyByValue } from "@/lib/localDb";
+import { apiKeyLimiter, ipLimiter } from "@/lib/rateLimiter.js";
 import { getCounter, checkQuota } from "@/lib/quotaDb";
 import { getModelInfo, getComboModels } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
@@ -77,6 +78,48 @@ export async function handleChat(request, clientRawRequest = null) {
     if (!valid) {
       log.warn("AUTH", "Invalid API key (requireApiKey=true)");
       return errorResponse(HTTP_STATUS.UNAUTHORIZED, "Invalid API key");
+    }
+  }
+
+  // --- Rate Limiting ---
+  if (settings.rateLimitEnabled) {
+    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || request.headers.get('x-real-ip')
+      || 'unknown';
+
+    // Per-IP check
+    const ipResult = ipLimiter.check(clientIp);
+    if (!ipResult.allowed) {
+      return new Response(JSON.stringify({
+        error: { message: `Rate limit exceeded. Retry after ${Math.ceil(ipResult.retryAfterMs / 1000)}s`, type: 'rate_limit_error' }
+      }), {
+        status: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Retry-After': String(Math.ceil(ipResult.retryAfterMs / 1000)),
+          'X-RateLimit-Limit': String(settings.rateLimitPerIp ?? 120),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset': String(Math.ceil((Date.now() + ipResult.retryAfterMs) / 1000))
+        }
+      });
+    }
+
+    // Per-key check (if key identified)
+    if (apiKey) {
+      const keyResult = apiKeyLimiter.check(apiKey);
+      if (!keyResult.allowed) {
+        return new Response(JSON.stringify({
+          error: { message: `API key rate limit exceeded. Retry after ${Math.ceil(keyResult.retryAfterMs / 1000)}s`, type: 'rate_limit_error' }
+        }), {
+          status: 429,
+          headers: {
+            'Content-Type': 'application/json',
+            'Retry-After': String(Math.ceil(keyResult.retryAfterMs / 1000)),
+            'X-RateLimit-Limit': String(settings.rateLimitPerKey ?? 60),
+            'X-RateLimit-Remaining': '0'
+          }
+        });
+      }
     }
   }
 
