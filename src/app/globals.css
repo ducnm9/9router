@@ -1,6 +1,15 @@
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 @import "tailwindcss";
 
+@property --mesh-x1 { syntax: '<percentage>'; inherits: false; initial-value: 20%; }
+@property --mesh-y1 { syntax: '<percentage>'; inherits: false; initial-value: 30%; }
+@property --mesh-x2 { syntax: '<percentage>'; inherits: false; initial-value: 70%; }
+@property --mesh-y2 { syntax: '<percentage>'; inherits: false; initial-value: 60%; }
+@property --mesh-x3 { syntax: '<percentage>'; inherits: false; initial-value: 40%; }
+@property --mesh-y3 { syntax: '<percentage>'; inherits: false; initial-value: 80%; }
+@property --mesh-x4 { syntax: '<percentage>'; inherits: false; initial-value: 80%; }
+@property --mesh-y4 { syntax: '<percentage>'; inherits: false; initial-value: 20%; }
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 /* macOS-inspired Color Palette with Terracotta Primary */
@@ -10,7 +19,7 @@
   --color-primary-hover: #C56243;
   
   /* Light theme */
-  --color-bg: #FBF9F6;
+  --color-bg: #F8F6F2;
   --color-bg-alt: #F5F1ED;
   --color-surface: #FFFFFF;
   --color-sidebar: rgba(246, 246, 246, 0.8);
@@ -22,11 +31,33 @@
   --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 12px rgba(0, 0, 0, 0.015);
   --shadow-warm: 0 2px 12px -2px rgba(217, 119, 87, 0.12);
   --shadow-elevated: 0 12px 28px -4px rgba(60, 50, 45, 0.06);
+
+  /* Glassmorphism Design Tokens */
+  --glass-blur: 18px;
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-bg-strong: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-border-hover: rgba(0, 0, 0, 0.12);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  --glass-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+  --glow-primary: rgba(217, 119, 87, 0.3);
+  --glow-purple: rgba(139, 92, 246, 0.25);
+  --glow-blue: rgba(59, 130, 246, 0.25);
+  --glow-amber: rgba(245, 158, 11, 0.25);
+  --glow-green: rgba(16, 185, 129, 0.25);
+  --mesh-1: rgba(217, 119, 87, 0.15);
+  --mesh-2: rgba(139, 92, 246, 0.12);
+  --mesh-3: rgba(59, 130, 246, 0.10);
+  --mesh-4: rgba(245, 158, 11, 0.10);
+  --transition-glass: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --mesh-duration: 20s;
+  --entrance-duration: 0.5s;
+  --entrance-easing: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dark {
   /* Dark theme */
-  --color-bg: #191918;
+  --color-bg: #0a0a1a;
   --color-bg-alt: #1F1F1E;
   --color-surface: #242423;
   --color-sidebar: rgba(30, 30, 30, 0.8);
@@ -38,6 +69,22 @@
   --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.1);
   --shadow-warm: 0 2px 12px -2px rgba(217, 119, 87, 0.15);
   --shadow-elevated: 0 12px 28px -4px rgba(0, 0, 0, 0.3);
+
+  --glass-bg: rgba(255, 255, 255, 0.07);
+  --glass-bg-strong: rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-border-hover: rgba(255, 255, 255, 0.20);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+  --glow-primary: rgba(217, 119, 87, 0.35);
+  --glow-purple: rgba(139, 92, 246, 0.30);
+  --glow-blue: rgba(59, 130, 246, 0.30);
+  --glow-amber: rgba(245, 158, 11, 0.30);
+  --glow-green: rgba(16, 185, 129, 0.30);
+  --mesh-1: rgba(217, 119, 87, 0.35);
+  --mesh-2: rgba(139, 92, 246, 0.30);
+  --mesh-3: rgba(59, 130, 246, 0.25);
+  --mesh-4: rgba(245, 158, 11, 0.20);
 }
 
 @theme inline {
@@ -216,6 +263,97 @@ body {
 
 .traffic-light.green {
   background: #27C93F;
+}
+
+/* Glassmorphism Utilities */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+.glass-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+.glow-sm { box-shadow: var(--glass-highlight), 0 0 10px var(--glow-color, var(--glow-primary)); }
+.glow-md { box-shadow: var(--glass-highlight), 0 0 20px var(--glow-color, var(--glow-primary)); }
+.glow-lg { box-shadow: var(--glass-highlight), 0 0 30px var(--glow-color, var(--glow-primary)); }
+
+.glow-primary { --glow-color: var(--glow-primary); }
+.glow-purple { --glow-color: var(--glow-purple); }
+.glow-blue { --glow-color: var(--glow-blue); }
+.glow-amber { --glow-color: var(--glow-amber); }
+
+/* Mesh gradient animation */
+@keyframes mesh-move {
+  0% {
+    --mesh-x1: 20%; --mesh-y1: 30%;
+    --mesh-x2: 70%; --mesh-y2: 60%;
+    --mesh-x3: 40%; --mesh-y3: 80%;
+    --mesh-x4: 80%; --mesh-y4: 20%;
+  }
+  100% {
+    --mesh-x1: 40%; --mesh-y1: 60%;
+    --mesh-x2: 30%; --mesh-y2: 30%;
+    --mesh-x3: 70%; --mesh-y3: 40%;
+    --mesh-x4: 50%; --mesh-y4: 70%;
+  }
+}
+
+.animate-mesh {
+  animation: mesh-move var(--mesh-duration) ease-in-out infinite alternate;
+}
+
+/* Glow pulse */
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: var(--glass-highlight), 0 0 15px var(--glow-color, var(--glow-primary)); }
+  50% { box-shadow: var(--glass-highlight), 0 0 25px var(--glow-color, var(--glow-primary)); }
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+.animate-glow-pulse:hover {
+  animation: none;
+  box-shadow: var(--glass-highlight), 0 0 30px var(--glow-color, var(--glow-primary));
+}
+
+/* Entrance animation */
+[data-animate] {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity var(--entrance-duration) var(--entrance-easing),
+              transform var(--entrance-duration) var(--entrance-easing);
+}
+[data-animate].animate-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Modal entrance */
+@keyframes modal-enter {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+.animate-modal-enter {
+  animation: modal-enter 0.25s ease-out forwards;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .animate-mesh { animation: none; }
+  [data-animate] { opacity: 1; transform: none; }
 }
 
 /* Changelog markdown body */
