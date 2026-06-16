@@ -39,6 +39,8 @@ const DEFAULT_SETTINGS = {
   rateLimitEnabled: false,
   rateLimitPerKey: 60,
   rateLimitPerIp: 120,
+  notificationsEnabled: false,
+  notificationChannels: [],
 };
 
 async function readRaw() {

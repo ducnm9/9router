@@ -13,6 +13,7 @@ import { isKeyExpired } from "@/lib/db/repos/apiKeysRepo.js";
 import { apiKeyLimiter, ipLimiter } from "@/lib/rateLimiter.js";
 import { getClientIp } from "@/lib/auth/loginLimiter.js";
 import { getCounter, checkQuota } from "@/lib/quotaDb";
+import { getNotifier } from "@/lib/notifier.js";
 import { getModelInfo, getComboModels } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
 import { errorResponse, unavailableResponse } from "open-sse/utils/error.js";
@@ -143,6 +144,17 @@ export async function handleChat(request, clientRawRequest = null) {
             ? `${quotaResult.usage.totalTokens.toLocaleString()}/${quotaResult.limit.maxTokens.toLocaleString()}`
             : "N/A";
           log.warn("QUOTA", `Key ${log.maskKey(apiKey)} exceeded quota: ${tokensDisplay}`);
+
+          // Fire budget alert notification (non-blocking)
+          getNotifier().send({
+            event: 'quota_exceeded',
+            keyId: keyConfig?.id,
+            keyName: keyConfig?.name,
+            usage: quotaResult.usage.totalTokens,
+            limit: quotaResult.limit.maxTokens,
+            unit: 'tokens'
+          }).catch(() => {}); // Never block request on notification failure
+
           return new Response(
             JSON.stringify({
               error: {
@@ -175,6 +187,16 @@ export async function handleChat(request, clientRawRequest = null) {
             costLimit: quotaResult.limit.maxCost,
             resetsAt: quotaResult.resetsAt,
           };
+
+          // Fire budget warning notification (non-blocking)
+          getNotifier().send({
+            event: 'quota_warning',
+            keyId: keyConfig?.id,
+            keyName: keyConfig?.name,
+            usage: quotaResult.usage.totalTokens,
+            limit: quotaResult.limit.maxTokens,
+            unit: 'tokens'
+          }).catch(() => {}); // Never block request on notification failure
         }
       }
     } catch (err) {
