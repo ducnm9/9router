@@ -43,7 +43,7 @@ function RecentRequests({ requests = [] }) {
       ) : (
         <div className="flex-1 overflow-y-auto">
           <table className="w-full text-xs border-collapse">
-            <thead className="sticky top-0 bg-bg z-10">
+            <thead className="sticky top-0 bg-white/80 dark:bg-white/5 backdrop-blur-sm z-10">
               <tr className="border-b border-border">
                 <th className="py-1.5 text-left font-semibold text-text-muted w-2"></th>
                 <th className="py-1.5 text-left font-semibold text-text-muted">Model</th>
