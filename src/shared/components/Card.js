@@ -1,6 +1,16 @@
 "use client";
 
 import { cn } from "@/shared/utils/cn";
+import { useIntersectionObserver, useTilt } from "@/shared/hooks";
+
+function mergeRefs(...refs) {
+  return (el) => {
+    refs.forEach((ref) => {
+      if (typeof ref === "function") ref(el);
+      else if (ref) ref.current = el;
+    });
+  };
+}
 
 export default function Card({
   children,
@@ -10,9 +20,23 @@ export default function Card({
   action,
   padding = "md",
   hover = false,
+  animate = false,
+  animateDelay,
+  tilt = false,
   className,
   ...props
 }) {
+  const animateRef = useIntersectionObserver();
+  const tiltRef = useTilt();
+
+  const cardRef =
+    animate || tilt
+      ? mergeRefs(
+          ...(animate ? [animateRef] : []),
+          ...(tilt ? [tiltRef] : [])
+        )
+      : undefined;
+
   const paddings = {
     none: "",
     xs: "p-3",
@@ -23,6 +47,9 @@ export default function Card({
 
   return (
     <div
+      ref={cardRef}
+      data-animate={animate ? "" : undefined}
+      style={animate && animateDelay ? { transitionDelay: `${animateDelay}ms` } : undefined}
       className={cn(
         "glass rounded-2xl",
         "transition-all duration-300",
