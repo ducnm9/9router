@@ -25,6 +25,7 @@ export default function APIPageClient({ machineId }) {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newKeyName, setNewKeyName] = useState("");
+  const [newKeyQuota, setNewKeyQuota] = useState({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
   const [createdKey, setCreatedKey] = useState(null);
   const [confirmState, setConfirmState] = useState(null);
 
@@ -690,9 +691,25 @@ export default function APIPageClient({ machineId }) {
       const data = await res.json();
 
       if (res.ok) {
+        // Save quota if user set any limit
+        const hasQuota = newKeyQuota.maxTokens || newKeyQuota.maxCost;
+        if (hasQuota && data.id) {
+          try {
+            await fetch(`/api/keys/${data.id}/quota`, {
+              method: "PUT",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                maxTokens: newKeyQuota.maxTokens ? parseInt(newKeyQuota.maxTokens) : null,
+                maxCost: newKeyQuota.maxCost ? parseFloat(newKeyQuota.maxCost) : null,
+                warningThreshold: newKeyQuota.warningThreshold ? parseFloat(newKeyQuota.warningThreshold) : 0.8,
+              }),
+            });
+          } catch { /* quota save is best-effort */ }
+        }
         setCreatedKey(data.key);
         await fetchData();
         setNewKeyName("");
+        setNewKeyQuota({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
         setShowAddModal(false);
       }
     } catch (error) {
@@ -1279,6 +1296,7 @@ export default function APIPageClient({ machineId }) {
         onClose={() => {
           setShowAddModal(false);
           setNewKeyName("");
+          setNewKeyQuota({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
         }}
       >
         <div className="flex flex-col gap-4">
@@ -1288,6 +1306,36 @@ export default function APIPageClient({ machineId }) {
             onChange={(e) => setNewKeyName(e.target.value)}
             placeholder="Production Key"
           />
+          <div className="border-t border-border pt-3">
+            <p className="text-xs text-text-muted mb-3">Quota Limits (optional)</p>
+            <div className="flex flex-col gap-3">
+              <Input
+                label="Monthly Token Limit"
+                type="number"
+                value={newKeyQuota.maxTokens}
+                onChange={(e) => setNewKeyQuota({ ...newKeyQuota, maxTokens: e.target.value })}
+                placeholder="e.g. 1000000 (empty = unlimited)"
+              />
+              <Input
+                label="Monthly Cost Limit (USD)"
+                type="number"
+                step="0.01"
+                value={newKeyQuota.maxCost}
+                onChange={(e) => setNewKeyQuota({ ...newKeyQuota, maxCost: e.target.value })}
+                placeholder="e.g. 5.00 (empty = unlimited)"
+              />
+              <Input
+                label="Warning Threshold"
+                type="number"
+                step="0.05"
+                min="0.1"
+                max="0.99"
+                value={newKeyQuota.warningThreshold}
+                onChange={(e) => setNewKeyQuota({ ...newKeyQuota, warningThreshold: e.target.value })}
+                placeholder="0.8 (80%)"
+              />
+            </div>
+          </div>
           <div className="flex gap-2">
             <Button onClick={handleCreateKey} fullWidth disabled={!newKeyName.trim()}>
               Create
@@ -1296,6 +1344,7 @@ export default function APIPageClient({ machineId }) {
               onClick={() => {
                 setShowAddModal(false);
                 setNewKeyName("");
+                setNewKeyQuota({ maxTokens: "", maxCost: "", warningThreshold: "0.8" });
               }}
               variant="ghost"
               fullWidth
