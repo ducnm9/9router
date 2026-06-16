@@ -1,6 +1,7 @@
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/shared/components/ThemeProvider";
+import MeshBackground from "@/shared/components/MeshBackground";
 import "@/lib/initCloudSync"; // Auto-initialize cloud sync
 import "@/lib/network/initOutboundProxy"; // Auto-initialize outbound proxy env
 import { initConsoleLogCapture } from "@/lib/consoleLogBuffer";
@@ -39,6 +40,7 @@ export default function RootLayout({ children }) {
         />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
+        <MeshBackground />
         <ThemeProvider>
           <RuntimeI18nProvider>
             {children}
