@@ -22,6 +22,29 @@ import { updateProviderCredentials, checkAndRefreshToken } from "../services/tok
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 
 /**
+ * Add quota warning headers to a response if quota warning is active.
+ */
+function addQuotaHeaders(response, request) {
+  const warning = request?.__quotaWarning;
+  if (!warning || !response) return response;
+
+  // Create new response with same body/status but additional headers
+  const newHeaders = new Headers(response.headers);
+  newHeaders.set("X-Quota-Warning", "true");
+  newHeaders.set("X-Quota-Tokens-Used", String(warning.tokensUsed));
+  newHeaders.set("X-Quota-Tokens-Limit", String(warning.tokensLimit || "unlimited"));
+  newHeaders.set("X-Quota-Cost-Used", String(warning.costUsed));
+  newHeaders.set("X-Quota-Cost-Limit", String(warning.costLimit || "unlimited"));
+  newHeaders.set("X-Quota-Reset", warning.resetsAt);
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: newHeaders,
+  });
+}
+
+/**
  * Handle chat completion request
  * Supports: OpenAI, Claude, Gemini, OpenAI Responses API formats
  * Format detection and translation handled by translator
@@ -154,7 +177,7 @@ export async function handleChat(request, clientRawRequest = null) {
     const comboStrategy = comboSpecificStrategy || settings.comboStrategy || "fallback";
     
     log.info("CHAT", `Combo "${modelStr}" with ${comboModels.length} models (strategy: ${comboStrategy})`);
-    return handleComboChat({
+    const comboResponse = await handleComboChat({
       body,
       models: comboModels,
       handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
@@ -163,10 +186,12 @@ export async function handleChat(request, clientRawRequest = null) {
       comboStrategy,
       comboTimeoutMs: settings.comboTimeoutMs || 60000
     });
+    return addQuotaHeaders(comboResponse, request);
   }
 
   // Single model request
-  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  const singleResponse = await handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  return addQuotaHeaders(singleResponse, request);
 }
 
 /**
