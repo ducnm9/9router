@@ -61,6 +61,10 @@ export default function APIPageClient({ machineId }) {
   const [showDisableTsModal, setShowDisableTsModal] = useState(false);
   const tsLogRef = useRef(null);
 
+  // Quota state
+  const [quotaSummary, setQuotaSummary] = useState(null);
+  const [newKeyQuota, setNewKeyQuota] = useState({ maxTokens: null, maxCost: null, warningThreshold: 0.8 });
+
   // API key visibility toggle state
   const [visibleKeys, setVisibleKeys] = useState(new Set());
 
@@ -221,6 +225,14 @@ export default function APIPageClient({ machineId }) {
       if (keysRes.ok) {
         setKeys(keysData.keys || []);
       }
+      // Fetch quota summary
+      try {
+        const quotaRes = await fetch("/api/usage/quota-summary");
+        if (quotaRes.ok) {
+          const quotaData = await quotaRes.json();
+          setQuotaSummary(quotaData);
+        }
+      } catch (e) { /* ignore */ }
     } catch (error) {
       console.log("Error fetching data:", error);
     } finally {
@@ -579,9 +591,18 @@ export default function APIPageClient({ machineId }) {
       const data = await res.json();
 
       if (res.ok) {
+        // Save quota if configured
+        if (newKeyQuota.maxTokens || newKeyQuota.maxCost) {
+          await fetch(`/api/keys/${data.id}/quota`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newKeyQuota),
+          });
+        }
         setCreatedKey(data.key);
         await fetchData();
         setNewKeyName("");
+        setNewKeyQuota({ maxTokens: null, maxCost: null, warningThreshold: 0.8 });
         setShowAddModal(false);
       }
     } catch (error) {
@@ -984,6 +1005,28 @@ export default function APIPageClient({ machineId }) {
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
                   )}
+                  {/* Quota display */}
+                  {(() => {
+                    const quotaInfo = quotaSummary?.keys?.find(q => q.keyId === key.id);
+                    if (!quotaInfo) return null;
+                    const maxPercent = Math.max(quotaInfo.percentage.tokens, quotaInfo.percentage.cost);
+                    const barColor = quotaInfo.status === "exceeded" 
+                      ? "bg-red-500" 
+                      : quotaInfo.status === "warning" 
+                        ? "bg-yellow-500" 
+                        : "bg-green-500";
+                    return (
+                      <div className="mt-2">
+                        <div className="flex justify-between text-xs text-text-muted mb-1">
+                          <span>Tokens: {quotaInfo.percentage.tokens}%</span>
+                          <span>Cost: {quotaInfo.percentage.cost}%</span>
+                        </div>
+                        <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(maxPercent, 100)}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <Toggle
@@ -1000,6 +1043,18 @@ export default function APIPageClient({ machineId }) {
                     }}
                     title={key.isActive ? "Pause key" : "Resume key"}
                   />
+                  {quotaSummary?.keys?.find(q => q.keyId === key.id) && (
+                    <button
+                      onClick={async () => {
+                        await fetch(`/api/keys/${key.id}/quota/reset`, { method: "POST" });
+                        await fetchData();
+                      }}
+                      className="p-2 hover:bg-primary/10 rounded text-primary opacity-0 group-hover:opacity-100 transition-all"
+                      title="Reset quota"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">restart_alt</span>
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDeleteKey(key.id)}
                     className="p-2 hover:bg-red-500/10 rounded text-red-500 opacity-0 group-hover:opacity-100 transition-all"
@@ -1029,6 +1084,36 @@ export default function APIPageClient({ machineId }) {
             onChange={(e) => setNewKeyName(e.target.value)}
             placeholder="Production Key"
           />
+          <div className="border-t border-border pt-4 mt-2">
+            <p className="text-sm font-medium mb-3">Quota (optional)</p>
+            <div className="flex flex-col gap-3">
+              <Input
+                label="Monthly Token Limit"
+                type="number"
+                value={newKeyQuota.maxTokens || ""}
+                onChange={(e) => setNewKeyQuota({ ...newKeyQuota, maxTokens: e.target.value ? parseInt(e.target.value) : null })}
+                placeholder="e.g. 1000000 (empty = unlimited)"
+              />
+              <Input
+                label="Monthly Cost Limit (USD)"
+                type="number"
+                step="0.01"
+                value={newKeyQuota.maxCost || ""}
+                onChange={(e) => setNewKeyQuota({ ...newKeyQuota, maxCost: e.target.value ? parseFloat(e.target.value) : null })}
+                placeholder="e.g. 5.00 (empty = unlimited)"
+              />
+              <Input
+                label="Warning Threshold"
+                type="number"
+                step="0.05"
+                min="0.1"
+                max="0.99"
+                value={newKeyQuota.warningThreshold || ""}
+                onChange={(e) => setNewKeyQuota({ ...newKeyQuota, warningThreshold: e.target.value ? parseFloat(e.target.value) : 0.8 })}
+                placeholder="0.8 (80%)"
+              />
+            </div>
+          </div>
           <div className="flex gap-2">
             <Button onClick={handleCreateKey} fullWidth disabled={!newKeyName.trim()}>
               Create
