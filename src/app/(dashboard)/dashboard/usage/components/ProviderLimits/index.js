@@ -411,7 +411,7 @@ export default function ProviderLimits() {
   // Empty state
   if (!connectionsLoading && sortedConnections.length === 0) {
     return (
-      <Card padding="lg">
+      <Card padding="lg" animate>
         <div className="text-center py-12">
           <span className="material-symbols-outlined text-[64px] text-text-muted opacity-20">
             cloud_off
@@ -497,7 +497,7 @@ export default function ProviderLimits() {
 
       {/* Provider cards: 2 columns, compact */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {sortedConnections.map((conn) => {
+        {sortedConnections.map((conn, index) => {
           const quota = quotaData[conn.id];
           const isLoading = loading[conn.id];
           const error = errors[conn.id];
@@ -510,6 +510,8 @@ export default function ProviderLimits() {
             <Card
               key={conn.id}
               padding="none"
+              animate
+              animateDelay={index * 50}
               className={`min-w-0 ${isInactive ? "opacity-60" : ""}`}
             >
               <div className="px-4 py-3 border-b border-black/10 dark:border-white/10">
