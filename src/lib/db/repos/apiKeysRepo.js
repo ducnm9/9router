@@ -3,12 +3,17 @@ import { getAdapter } from "../driver.js";
 
 function rowToKey(row) {
   if (!row) return null;
+  let quota = null;
+  if (row.quota) {
+    try { quota = typeof row.quota === "string" ? JSON.parse(row.quota) : row.quota; } catch { /* ignore */ }
+  }
   return {
     id: row.id,
     key: row.key,
     name: row.name,
     machineId: row.machineId,
     isActive: row.isActive === 1 || row.isActive === true,
+    quota,
     createdAt: row.createdAt,
   };
 }
@@ -51,10 +56,12 @@ export async function updateApiKey(id, data) {
   db.transaction(() => {
     const row = db.get(`SELECT * FROM apiKeys WHERE id = ?`, [id]);
     if (!row) return;
-    const merged = { ...rowToKey(row), ...data };
+    const current = rowToKey(row);
+    const merged = { ...current, ...data };
+    const quotaStr = merged.quota ? JSON.stringify(merged.quota) : null;
     db.run(
-      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ? WHERE id = ?`,
-      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, id]
+      `UPDATE apiKeys SET key = ?, name = ?, machineId = ?, isActive = ?, quota = ? WHERE id = ?`,
+      [merged.key, merged.name, merged.machineId, merged.isActive ? 1 : 0, quotaStr, id]
     );
     result = merged;
   });
@@ -77,10 +84,5 @@ export async function validateApiKey(key) {
 export async function getApiKeyByValue(key) {
   const db = await getAdapter();
   const row = db.get(`SELECT * FROM apiKeys WHERE key = ?`, [key]);
-  if (!row) return null;
-  // Parse JSON fields if present
-  if (row.quota && typeof row.quota === "string") {
-    try { row.quota = JSON.parse(row.quota); } catch { /* keep as-is */ }
-  }
-  return row;
+  return rowToKey(row);
 }
