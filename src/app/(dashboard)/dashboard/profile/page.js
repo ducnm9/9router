@@ -107,7 +107,10 @@ export default function ProfilePage() {
       .then((data) => {
         if (data) {
           setNotificationsEnabled(data.enabled ?? false);
-          setNotificationChannels(data.channels || []);
+          setNotificationChannels((data.channels || []).map(ch => ({
+            ...ch,
+            id: ch.id || crypto.randomUUID()
+          })));
         }
       })
       .catch(() => {});
@@ -606,7 +609,15 @@ export default function ProfilePage() {
     }
   };
 
-  const addChannel = () => setNotificationChannels(prev => [...prev, { type: "webhook", url: "" }]);
+  const isValidUrl = (s) => {
+    if (!s) return false;
+    try { new URL(s); return true; } catch { return false; }
+  };
+
+  const addChannel = () => setNotificationChannels(prev => [
+    ...prev,
+    { id: crypto.randomUUID(), type: "webhook", url: "" }
+  ]);
   const removeChannel = (i) => setNotificationChannels(prev => prev.filter((_, idx) => idx !== i));
   const updateChannel = (i, key, val) => setNotificationChannels(prev => {
     const next = [...prev];
@@ -615,11 +626,12 @@ export default function ProfilePage() {
   });
 
   const saveNotificationChannels = async () => {
+    const validChannels = notificationChannels.filter(ch => isValidUrl(ch.url));
     try {
       await fetch("/api/settings/notifications", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ enabled: notificationsEnabled, channels: notificationChannels }),
+        body: JSON.stringify({ enabled: notificationsEnabled, channels: validChannels }),
       });
     } catch (err) {
       console.error("Failed to save notification channels:", err);
@@ -628,7 +640,7 @@ export default function ProfilePage() {
 
   const testChannel = async (i) => {
     const ch = notificationChannels[i];
-    if (!ch?.url) return;
+    if (!isValidUrl(ch?.url)) return;
     try {
       await fetch("/api/settings/notifications", {
         method: "POST",
@@ -1222,8 +1234,12 @@ export default function ProfilePage() {
                   min="1"
                   max="10000"
                   value={rateLimitPerKey}
-                  onChange={(e) => setRateLimitPerKey(Number(e.target.value))}
-                  onBlur={() => handleSettingChange("rateLimitPerKey", rateLimitPerKey)}
+                  onChange={(e) => setRateLimitPerKey(Math.max(1, Number(e.target.value) || 1))}
+                  onBlur={() => {
+                    const val = Math.max(1, Math.min(10000, rateLimitPerKey || 1));
+                    setRateLimitPerKey(val);
+                    handleSettingChange("rateLimitPerKey", val);
+                  }}
                   className="w-24 px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
                 />
               </div>
@@ -1236,8 +1252,12 @@ export default function ProfilePage() {
                   min="1"
                   max="10000"
                   value={rateLimitPerIp}
-                  onChange={(e) => setRateLimitPerIp(Number(e.target.value))}
-                  onBlur={() => handleSettingChange("rateLimitPerIp", rateLimitPerIp)}
+                  onChange={(e) => setRateLimitPerIp(Math.max(1, Number(e.target.value) || 1))}
+                  onBlur={() => {
+                    const val = Math.max(1, Math.min(10000, rateLimitPerIp || 1));
+                    setRateLimitPerIp(val);
+                    handleSettingChange("rateLimitPerIp", val);
+                  }}
                   className="w-24 px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
                 />
               </div>
@@ -1269,7 +1289,7 @@ export default function ProfilePage() {
           {notificationsEnabled && (
             <div className="flex flex-col gap-3">
               {notificationChannels.map((ch, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={ch.id || i} className="flex items-center gap-2">
                   <select
                     value={ch.type || "webhook"}
                     onChange={(e) => updateChannel(i, "type", e.target.value)}
