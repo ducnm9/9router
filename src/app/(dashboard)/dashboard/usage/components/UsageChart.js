@@ -49,7 +49,7 @@ export default function UsageChart({ period = "7d" }) {
   const hasData = data.some((d) => d.tokens > 0 || d.cost > 0);
 
   return (
-    <Card className="p-4 flex flex-col gap-3">
+    <Card animate className="p-4 flex flex-col gap-3">
       <div className="flex items-center gap-1 bg-bg-subtle rounded-lg p-1 border border-border self-start">
         <button
           onClick={() => setViewMode("tokens")}

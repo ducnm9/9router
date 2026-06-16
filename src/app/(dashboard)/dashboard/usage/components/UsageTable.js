@@ -147,7 +147,7 @@ export default function UsageTable({
   const totalColSpan = columns.length + valueColumns.length;
 
   return (
-    <Card className="overflow-hidden">
+    <Card animate className="overflow-hidden">
       <div className="p-4 border-b border-border bg-bg-subtle/50">
         <h3 className="font-semibold">{title}</h3>
       </div>
