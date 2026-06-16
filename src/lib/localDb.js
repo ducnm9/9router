@@ -692,6 +692,12 @@ export async function validateApiKey(key) {
   return found && found.isActive !== false;
 }
 
+export async function getApiKeyByValue(keyValue) {
+  const db = await getDb();
+  const found = db.data.apiKeys.find(k => k.key === keyValue && k.isActive !== false);
+  return found || null;
+}
+
 export async function cleanupProviderConnections() {
   const db = await getDb();
   const fieldsToCheck = [
