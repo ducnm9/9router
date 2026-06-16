@@ -10,6 +10,7 @@ import {
 import { cacheClaudeHeaders } from "open-sse/utils/claudeHeaderCache.js";
 import { getSettings, getApiKeyByValue } from "@/lib/localDb";
 import { apiKeyLimiter, ipLimiter } from "@/lib/rateLimiter.js";
+import { getClientIp } from "@/lib/auth/loginLimiter.js";
 import { getCounter, checkQuota } from "@/lib/quotaDb";
 import { getModelInfo, getComboModels } from "../services/model.js";
 import { handleChatCore } from "open-sse/handlers/chatCore.js";
@@ -83,9 +84,7 @@ export async function handleChat(request, clientRawRequest = null) {
 
   // --- Rate Limiting ---
   if (settings.rateLimitEnabled) {
-    const clientIp = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || request.headers.get('x-real-ip')
-      || 'unknown';
+    const clientIp = getClientIp(request);
 
     // Per-IP check
     const ipResult = ipLimiter.check(clientIp);
@@ -116,7 +115,8 @@ export async function handleChat(request, clientRawRequest = null) {
             'Content-Type': 'application/json',
             'Retry-After': String(Math.ceil(keyResult.retryAfterMs / 1000)),
             'X-RateLimit-Limit': String(settings.rateLimitPerKey ?? 60),
-            'X-RateLimit-Remaining': '0'
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': String(Math.ceil((Date.now() + keyResult.retryAfterMs) / 1000))
           }
         });
       }
