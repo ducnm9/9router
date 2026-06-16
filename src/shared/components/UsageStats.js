@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { FREE_PROVIDERS } from "@/shared/constants/providers";
 import Badge from "./Badge";
@@ -175,6 +175,7 @@ const TABLE_OPTIONS = [
 ];
 
 const PERIODS = [
+  { value: "today", label: "Today" },
   { value: "24h", label: "24h" },
   { value: "7d", label: "7D" },
   { value: "30d", label: "30D" },
