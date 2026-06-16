@@ -52,24 +52,24 @@ export default function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Overlay */}
       <div
-        className="absolute inset-0 bg-black/30 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/30 backdrop-blur-[8px]"
         onClick={closeOnOverlay ? onClose : undefined}
       />
 
       {/* Modal content */}
       <div
         className={cn(
-          "relative w-full bg-surface",
-          "border border-black/10 dark:border-white/10",
-          "rounded-xl shadow-2xl",
-          "animate-in fade-in zoom-in-95 duration-200",
+          "relative w-full glass-strong",
+          "rounded-2xl",
+          "shadow-[0_0_40px_var(--glow-purple)]",
+          "animate-modal-enter",
           sizes[size],
           className
         )}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-2 border-b border-black/5 dark:border-white/5">
+          <div className="flex items-center justify-between p-2 border-b border-[var(--glass-border)]">
             <div className="flex items-center">
               <div className="flex items-center gap-2 mr-4">
                 <div className="w-3 h-3 rounded-full bg-[#FF5F56]" />
@@ -98,7 +98,7 @@ export default function Modal({
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-black/5 dark:border-white/5">
+          <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--glass-border)]">
             {footer}
           </div>
         )}
