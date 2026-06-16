@@ -29,10 +29,13 @@ describe('RateLimiter', () => {
 
   it('resets after window expires', () => {
     vi.useFakeTimers();
-    for (let i = 0; i < 5; i++) limiter.check('key-1');
-    vi.advanceTimersByTime(60001);
-    expect(limiter.check('key-1').allowed).toBe(true);
-    vi.useRealTimers();
+    try {
+      for (let i = 0; i < 5; i++) limiter.check('key-1');
+      vi.advanceTimersByTime(60001);
+      expect(limiter.check('key-1').allowed).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('supports per-IP limiting', () => {
@@ -40,5 +43,12 @@ describe('RateLimiter', () => {
     for (let i = 0; i < 10; i++) ipLimiter.check('192.168.1.1');
     expect(ipLimiter.check('192.168.1.1').allowed).toBe(false);
     expect(ipLimiter.check('192.168.1.2').allowed).toBe(true);
+  });
+
+  it('reset() clears the key counter', () => {
+    for (let i = 0; i < 5; i++) limiter.check('key-reset');
+    expect(limiter.check('key-reset').allowed).toBe(false);
+    limiter.reset('key-reset');
+    expect(limiter.check('key-reset').allowed).toBe(true);
   });
 });

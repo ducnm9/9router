@@ -5,17 +5,22 @@
  */
 export class RateLimiter {
   constructor({ windowMs = 60000, maxRequests = 60, keyPrefix = '' } = {}) {
+    if (maxRequests <= 0) throw new Error('RateLimiter: maxRequests must be > 0');
+    if (windowMs <= 0) throw new Error('RateLimiter: windowMs must be > 0');
     this.windowMs = windowMs;
     this.maxRequests = maxRequests;
     this.keyPrefix = keyPrefix;
     this.windows = new Map(); // key -> [timestamp, ...]
 
     // Auto-cleanup every 5 minutes
-    this._cleanupInterval = setInterval(() => this._cleanup(), 5 * 60 * 1000);
-    if (this._cleanupInterval.unref) this._cleanupInterval.unref();
+    if (typeof setInterval !== 'undefined') {
+      this._cleanupInterval = setInterval(() => this._cleanup(), 5 * 60 * 1000);
+      if (this._cleanupInterval?.unref) this._cleanupInterval.unref();
+    }
   }
 
   check(key) {
+    if (key == null) throw new Error('RateLimiter.check: key must not be null or undefined');
     const fullKey = this.keyPrefix + key;
     const now = Date.now();
     const windowStart = now - this.windowMs;
@@ -35,7 +40,7 @@ export class RateLimiter {
       return {
         allowed: true,
         remaining: this.maxRequests - timestamps.length,
-        resetMs: timestamps.length > 0 ? timestamps[0] + this.windowMs - now : this.windowMs,
+        resetMs: timestamps[0] + this.windowMs - now,
       };
     }
 
@@ -68,7 +73,7 @@ export class RateLimiter {
   }
 
   destroy() {
-    clearInterval(this._cleanupInterval);
+    if (this._cleanupInterval) clearInterval(this._cleanupInterval);
     this.windows.clear();
   }
 }
