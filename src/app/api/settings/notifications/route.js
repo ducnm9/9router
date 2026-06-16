@@ -20,7 +20,23 @@ export async function GET() {
 
 export async function PUT(request) {
   try {
-    const { channels, enabled } = await request.json();
+    const body = await request.json();
+    const { channels, enabled } = body;
+
+    // Validate channels is an array if provided
+    if (channels !== undefined && !Array.isArray(channels)) {
+      return NextResponse.json({ error: 'channels must be an array' }, { status: 400 });
+    }
+
+    // Validate each channel has required fields
+    if (Array.isArray(channels)) {
+      for (const ch of channels) {
+        if (!ch.url || typeof ch.url !== 'string') {
+          return NextResponse.json({ error: 'each channel must have a url string' }, { status: 400 });
+        }
+      }
+    }
+
     await updateSettings({
       notificationChannels: channels || [],
       notificationsEnabled: enabled ?? false,
