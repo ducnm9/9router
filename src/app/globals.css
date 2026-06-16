@@ -17,13 +17,21 @@
   /* Primary - Warm Coral/Terracotta */
   --color-primary: #D97757;
   --color-primary-hover: #C56243;
+  --color-brand-300: #EE9B7A;
+  --color-brand-500: #D97757;
+  --color-brand-600: #C56243;
   
   /* Light theme */
   --color-bg: #F8F6F2;
   --color-bg-alt: #F5F1ED;
   --color-surface: #FFFFFF;
+  --color-surface-2: #F0EFEC;
+  --color-surface-3: #E6E4DD;
+  --color-surface-secondary: #F0EFEC;
   --color-sidebar: rgba(246, 246, 246, 0.8);
   --color-border: rgba(0, 0, 0, 0.1);
+  --color-border-subtle: rgba(0, 0, 0, 0.06);
+  --color-text-primary: #D97757;
   --color-text-main: #383733;
   --color-text-muted: #75736E;
   
@@ -60,8 +68,13 @@
   --color-bg: #0a0a1a;
   --color-bg-alt: #1F1F1E;
   --color-surface: #242423;
+  --color-surface-2: #2D2D2C;
+  --color-surface-3: #333331;
+  --color-surface-secondary: #2D2D2C;
   --color-sidebar: rgba(30, 30, 30, 0.8);
   --color-border: rgba(255, 255, 255, 0.1);
+  --color-border-subtle: rgba(255, 255, 255, 0.08);
+  --color-text-primary: #EE9B7A;
   --color-text-main: #ECEBE8;
   --color-text-muted: #9E9D99;
   
@@ -91,6 +104,20 @@
   /* Primary */
   --color-primary: var(--color-primary);
   --color-primary-hover: var(--color-primary-hover);
+  --color-brand-300: var(--color-brand-300);
+  --color-brand-500: var(--color-brand-500);
+  --color-brand-600: var(--color-brand-600);
+  
+  /* Surface scale */
+  --color-surface-2: var(--color-surface-2);
+  --color-surface-3: var(--color-surface-3);
+  --color-surface-secondary: var(--color-surface-secondary);
+  
+  /* Text */
+  --color-text-primary: var(--color-text-primary);
+  
+  /* Borders */
+  --color-border-subtle: var(--color-border-subtle);
   
   /* Auto-switch colors (use CSS variables from :root/.dark) */
   --color-bg: var(--color-bg);
