@@ -107,7 +107,7 @@ export default function NewProviderPage() {
           {selectedProvider && (
             <Card.Section className="flex items-center gap-3">
               <div
-                className="size-10 rounded-lg flex items-center justify-center bg-bg border border-border"
+                className="size-10 rounded-lg flex items-center justify-center bg-white/30 dark:bg-white/5 border border-border"
               >
                 <span
                   className="material-symbols-outlined text-xl"

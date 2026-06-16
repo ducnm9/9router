@@ -169,9 +169,9 @@ export default function ModelVisibilityPage() {
     return (
       <div className="space-y-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-surface rounded w-48" />
-          <div className="h-12 bg-surface rounded" />
-          <div className="h-64 bg-surface rounded" />
+          <div className="h-8 bg-white/10 dark:bg-white/5 rounded w-48" />
+          <div className="h-12 bg-white/10 dark:bg-white/5 rounded" />
+          <div className="h-64 bg-white/10 dark:bg-white/5 rounded" />
         </div>
       </div>
     );
@@ -215,7 +215,7 @@ export default function ModelVisibilityPage() {
           <select
             value={filterProvider}
             onChange={(e) => setFilterProvider(e.target.value)}
-            className="px-3 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 bg-surface text-text-main focus:outline-none focus:ring-1 focus:ring-primary/30"
+            className="px-3 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 bg-white/50 dark:bg-white/[0.04] backdrop-blur-[12px] text-text-main focus:outline-none focus:ring-1 focus:ring-primary/30"
           >
             <option value="all">All Providers</option>
             {providers.map((p) => (
@@ -227,7 +227,7 @@ export default function ModelVisibilityPage() {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 bg-surface text-text-main focus:outline-none focus:ring-1 focus:ring-primary/30"
+            className="px-3 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 bg-white/50 dark:bg-white/[0.04] backdrop-blur-[12px] text-text-main focus:outline-none focus:ring-1 focus:ring-primary/30"
           >
             <option value="all">All Status</option>
             <option value="visible">Visible Only</option>
@@ -358,7 +358,7 @@ export default function ModelVisibilityPage() {
       {/* Floating save bar */}
       {hasChanges && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-          <div className="flex items-center gap-4 px-6 py-3 rounded-xl bg-surface border border-black/10 dark:border-white/10 shadow-lg backdrop-blur-xl">
+          <div className="flex items-center gap-4 px-6 py-3 rounded-xl bg-white/70 dark:bg-white/10 border border-black/10 dark:border-white/10 shadow-lg backdrop-blur-xl">
             <span className="text-sm text-text-muted">
               {pendingChanges.size} model{pendingChanges.size !== 1 ? "s" : ""} changed
             </span>

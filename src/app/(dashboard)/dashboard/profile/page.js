@@ -368,7 +368,7 @@ export default function ProfilePage() {
             </div>
           </div>
           <div className="flex flex-col gap-3 pt-4 border-t border-border">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-bg border border-border">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-white/30 dark:bg-white/5 border border-border">
               <div>
                 <p className="font-medium">Database Location</p>
                 <p className="text-sm text-text-muted font-mono">~/.9router/db.json</p>
