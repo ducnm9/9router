@@ -39,10 +39,10 @@ export default function Input({
           disabled={disabled}
           className={cn(
             "w-full py-2 px-3 text-sm text-text-main",
-            "bg-white dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-md",
+            "bg-white/50 dark:bg-white/[0.04] backdrop-blur-[12px] border border-[var(--glass-border)] rounded-[10px]",
             "placeholder-text-muted/60",
-            "focus:ring-1 focus:ring-primary/30 focus:border-primary/50 focus:outline-none",
-            "transition-all shadow-inner disabled:opacity-50 disabled:cursor-not-allowed",
+            "focus:border-primary/50 focus:shadow-[0_0_12px_var(--glow-primary)] focus:outline-none",
+            "transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed",
             // iOS zoom fix
             "text-[16px] sm:text-sm",
             icon && "pl-10",
