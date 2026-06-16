@@ -34,6 +34,7 @@ export default function APIPageClient({ machineId }) {
   const [editQuotaForm, setEditQuotaForm] = useState({ maxTokens: null, maxCost: null, warningThreshold: 0.8 });
   const [viewQuotaKey, setViewQuotaKey] = useState(null);
   const [viewQuotaData, setViewQuotaData] = useState(null);
+  const [quotaSummary, setQuotaSummary] = useState(null);
 
   const [requireApiKey, setRequireApiKey] = useState(false);
   const [requireLogin, setRequireLogin] = useState(true);
@@ -332,6 +333,14 @@ export default function APIPageClient({ machineId }) {
       if (keysRes.ok) {
         setKeys(keysData.keys || []);
       }
+      // Fetch quota summary
+      try {
+        const quotaRes = await fetch("/api/usage/quota-summary");
+        if (quotaRes.ok) {
+          const quotaData = await quotaRes.json();
+          setQuotaSummary(quotaData);
+        }
+      } catch (e) { /* ignore quota fetch errors */ }
     } catch (error) {
       console.log("Error fetching data:", error);
     } finally {
@@ -1241,6 +1250,28 @@ export default function APIPageClient({ machineId }) {
                   {key.isActive === false && (
                     <p className="text-xs text-orange-500 mt-1">Paused</p>
                   )}
+                  {/* Quota inline progress bar */}
+                  {(() => {
+                    const quotaInfo = quotaSummary?.keys?.find(q => q.keyId === key.id);
+                    if (!quotaInfo) return null;
+                    const maxPercent = Math.max(quotaInfo.percentage.tokens, quotaInfo.percentage.cost);
+                    const barColor = quotaInfo.status === "exceeded"
+                      ? "bg-red-500"
+                      : quotaInfo.status === "warning"
+                        ? "bg-yellow-500"
+                        : "bg-green-500";
+                    return (
+                      <div className="mt-2">
+                        <div className="flex justify-between text-xs text-text-muted mb-1">
+                          <span>Tokens: {quotaInfo.percentage.tokens}%</span>
+                          <span>Cost: {quotaInfo.percentage.cost}%</span>
+                        </div>
+                        <div className="w-full bg-black/5 dark:bg-white/5 rounded-full h-1.5">
+                          <div className={`h-1.5 rounded-full transition-all ${barColor}`} style={{ width: `${Math.min(maxPercent, 100)}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1636,8 +1667,8 @@ export default function APIPageClient({ machineId }) {
                 <p className="font-medium">{viewQuotaData.period}</p>
               </div>
               <div>
-                <p className="text-text-muted text-xs">Cost Rate</p>
-                <p className="font-medium">${viewQuotaData.costRate}/1K tokens</p>
+                <p className="text-text-muted text-xs">Resets At</p>
+                <p className="font-medium">{new Date(viewQuotaData.resetsAt).toLocaleDateString()}</p>
               </div>
             </div>
           </div>

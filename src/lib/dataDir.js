@@ -12,7 +12,7 @@ function defaultDir() {
 }
 
 export function getDataDir() {
-  const configured = process.env.DATA_DIR;
+  const configured = process.env.NROUTER_DATA_DIR || process.env.DATA_DIR;
   if (!configured) return defaultDir();
 
   // On Windows, ignore Unix-style absolute paths (e.g. /var/lib/...) that come
