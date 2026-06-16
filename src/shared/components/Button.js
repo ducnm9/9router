@@ -3,11 +3,11 @@
 import { cn } from "@/shared/utils/cn";
 
 const variants = {
-  primary: "bg-gradient-to-b from-primary to-primary-hover text-white shadow-sm",
-  secondary: "bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 text-text-main hover:bg-black/5 dark:hover:bg-white/5",
-  outline: "border border-black/15 dark:border-white/15 text-text-main hover:bg-black/5",
-  ghost: "text-text-muted hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-main",
-  danger: "bg-red-500 text-white hover:bg-red-600 shadow-sm",
+  primary: "bg-gradient-to-b from-primary to-primary-hover text-white shadow-[0_0_15px_var(--glow-primary)] hover:shadow-[0_0_25px_var(--glow-primary)] hover:-translate-y-0.5",
+  secondary: "glass text-text-main hover:glow-md hover:border-[var(--glass-border-hover)]",
+  outline: "glass text-text-main hover:glow-sm hover:border-[var(--glass-border-hover)]",
+  ghost: "text-text-muted hover:bg-white/10 dark:hover:bg-white/5 hover:text-text-main",
+  danger: "bg-red-500 text-white hover:bg-red-600 shadow-[0_0_15px_rgba(239,68,68,0.3)]",
 };
 
 const sizes = {
@@ -32,7 +32,7 @@ export default function Button({
     <button
       className={cn(
         "inline-flex items-center justify-center gap-2 font-medium transition-all duration-200 cursor-pointer",
-        "active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
+        "active:scale-[0.98] focus:shadow-[0_0_0_3px_var(--glow-primary)] focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
         variants[variant],
         sizes[size],
         fullWidth && "w-full",
