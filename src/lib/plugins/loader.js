@@ -1,4 +1,6 @@
 // src/lib/plugins/loader.js
+// This module MUST run server-side only (uses dynamic fs imports).
+// It is excluded from webpack bundling via next.config.mjs externals.
 import { readdir, readFile } from 'fs/promises';
 import { join, resolve } from 'path';
 import { registerHook, clearHooks } from './hooks.js';
@@ -25,7 +27,7 @@ export async function loadPlugins() {
         continue;
       }
       const mainFile = join(pluginDir, manifest.main || 'index.js');
-      const plugin = await import(mainFile);
+      const plugin = await import(/* webpackIgnore: true */ mainFile);
       if (typeof plugin.register === 'function') {
         await plugin.register({ registerHook, pluginId: manifest.id });
       }

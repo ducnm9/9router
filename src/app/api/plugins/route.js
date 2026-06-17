@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextResponse } from "next/server.js";
+import { cookies } from "next/headers.js";
 import { getSettings } from "@/lib/localDb";
 import { verifyDashboardAuthToken } from "@/lib/auth/dashboardSession";
 import { getLoadedPlugins, loadPlugins, unloadPlugins } from "@/lib/plugins/loader.js";
