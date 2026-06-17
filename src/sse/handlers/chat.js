@@ -26,6 +26,7 @@ import { updateProviderCredentials, checkAndRefreshToken } from "../services/tok
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 import { getHealthTracker } from "@/lib/providerHealth.js";
+import { getRequestCache } from "@/lib/requestCache.js";
 
 /**
  * Apply routing strategy to combo models.
@@ -268,6 +269,27 @@ export async function handleChat(request, clientRawRequest = null) {
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Missing model");
   }
 
+  // --- Response Cache Check ---
+  let _cacheKey = null;
+  if (settings.cacheEnabled && !body.stream) {
+    const cache = getRequestCache();
+    _cacheKey = cache.buildKey(body);
+    if (_cacheKey) {
+      const cached = cache.get(_cacheKey);
+      if (cached) {
+        log.debug("CACHE", `HIT ${_cacheKey}`);
+        return new Response(JSON.stringify({ ...cached, _cached: true }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Cache': 'HIT',
+            'X-Cache-Key': _cacheKey
+          }
+        });
+      }
+    }
+  }
+
   // Bypass naming/warmup requests before combo rotation to avoid wasting rotation slots
   const userAgent = request?.headers?.get("user-agent") || "";
   const bypassResponse = handleBypassRequest(body, modelStr, userAgent, !!settings.ccFilterNaming);
@@ -300,7 +322,7 @@ export async function handleChat(request, clientRawRequest = null) {
     }
 
     log.info("CHAT", `Combo "${modelStr}" with ${orderedModels.length} models (strategy: ${comboStrategy}, routing: ${settings.routingStrategy || 'priority'}, sticky: ${comboStickyLimit})`);
-    return handleComboChat({
+    const comboResponse = await handleComboChat({
       body,
       models: orderedModels,
       handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
@@ -309,10 +331,24 @@ export async function handleChat(request, clientRawRequest = null) {
       comboStrategy,
       comboStickyLimit
     });
+    if (_cacheKey && comboResponse?.status === 200) {
+      try {
+        const data = await comboResponse.clone().json();
+        if (!data.error) { getRequestCache().set(_cacheKey, data); log.debug("CACHE", `SET ${_cacheKey}`); }
+      } catch { /* non-JSON, skip */ }
+    }
+    return comboResponse;
   }
 
   // Single model request
-  return handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  const singleResponse = await handleSingleModelChat(body, modelStr, clientRawRequest, request, apiKey);
+  if (_cacheKey && singleResponse?.status === 200) {
+    try {
+      const data = await singleResponse.clone().json();
+      if (!data.error) { getRequestCache().set(_cacheKey, data); log.debug("CACHE", `SET ${_cacheKey}`); }
+    } catch { /* non-JSON or streaming, skip */ }
+  }
+  return singleResponse;
 }
 
 /**

@@ -43,6 +43,9 @@ const DEFAULT_SETTINGS = {
   notificationChannels: [],
   routingStrategy: 'priority', // 'priority' | 'latency' | 'balanced'
   skipUnhealthyProviders: false,
+  cacheEnabled: false,
+  cacheTtlMinutes: 5,
+  cacheMaxSize: 500,
 };
 
 async function readRaw() {
