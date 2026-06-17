@@ -25,6 +25,7 @@ import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
 import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
+import { getHealthTracker } from "@/lib/providerHealth.js";
 
 /**
  * Handle chat completion request
@@ -324,6 +325,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
     }
 
     // Use shared chatCore
+    const _healthStart = Date.now();
     const chatSettings = await getSettings();
     const providerThinking = (chatSettings.providerThinking || {})[provider] || null;
     const result = await handleChatCore({
@@ -355,6 +357,12 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
     });
 
     if (result.success) {
+      // Record provider health success
+      getHealthTracker().recordSuccess(provider, {
+        latencyMs: Date.now() - _healthStart,
+        model,
+        connectionId: credentials.connectionId
+      });
       // Non-blocking audit log (fire-and-forget)
       logAuditEvent({
         action: 'chat.request',
@@ -369,6 +377,14 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       }).catch(() => {});
       return result.response;
     }
+
+    // Record provider health failure
+    getHealthTracker().recordFailure(provider, {
+      statusCode: result.status,
+      error: result.error,
+      model,
+      connectionId: credentials.connectionId
+    });
 
     // Mark account unavailable (auto-calculates cooldown with exponential backoff, or precise resetsAtMs)
     const { shouldFallback } = await markAccountUnavailable(credentials.connectionId, result.status, result.error, provider, model, result.resetsAtMs);
