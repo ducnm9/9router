@@ -41,6 +41,8 @@ const DEFAULT_SETTINGS = {
   rateLimitPerIp: 120,
   notificationsEnabled: false,
   notificationChannels: [],
+  routingStrategy: 'priority', // 'priority' | 'latency' | 'balanced'
+  skipUnhealthyProviders: false,
 };
 
 async function readRaw() {
