@@ -185,12 +185,13 @@ export default function UsersPage() {
 
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
-            <h2 className="text-lg font-semibold mb-4">Add User</h2>
+          <div role="dialog" aria-modal="true" aria-labelledby="add-user-title" className="bg-surface rounded-xl shadow-xl p-6 w-full max-w-md mx-4">
+            <h2 id="add-user-title" className="text-lg font-semibold mb-4">Add User</h2>
             <div className="flex flex-col gap-3">
               <div>
-                <label className="block text-sm font-medium mb-1">Email *</label>
+                <label htmlFor="new-user-email" className="block text-sm font-medium mb-1">Email *</label>
                 <input
+                  id="new-user-email"
                   type="email"
                   value={newUser.email}
                   onChange={(e) => setNewUser((p) => ({ ...p, email: e.target.value }))}
@@ -199,8 +200,9 @@ export default function UsersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
+                <label htmlFor="new-user-name" className="block text-sm font-medium mb-1">Name</label>
                 <input
+                  id="new-user-name"
                   type="text"
                   value={newUser.name}
                   onChange={(e) => setNewUser((p) => ({ ...p, name: e.target.value }))}
@@ -209,8 +211,9 @@ export default function UsersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Role</label>
+                <label htmlFor="new-user-role" className="block text-sm font-medium mb-1">Role</label>
                 <select
+                  id="new-user-role"
                   value={newUser.role}
                   onChange={(e) => setNewUser((p) => ({ ...p, role: e.target.value }))}
                   className="w-full px-3 py-2 border rounded-lg bg-surface-secondary border-border text-sm"

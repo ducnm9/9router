@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { Card, Button } from "@/shared/components";
 
 export default function AuditPage() {
@@ -97,8 +97,8 @@ export default function AuditPage() {
               </thead>
               <tbody>
                 {logs.map((log) => (
-                  <>
-                    <tr key={log.id} className="border-b border-border/50 last:border-0 hover:bg-surface-hover/30">
+                  <Fragment key={log.id}>
+                    <tr className="border-b border-border/50 last:border-0 hover:bg-surface-hover/30">
                       <td className="py-2 pr-4 text-text-muted whitespace-nowrap">
                         {new Date(log.timestamp).toLocaleString()}
                       </td>
@@ -124,7 +124,7 @@ export default function AuditPage() {
                       </td>
                     </tr>
                     {expanded === log.id && (
-                      <tr key={`${log.id}-detail`} className="border-b border-border/50">
+                      <tr className="border-b border-border/50">
                         <td colSpan={6} className="pb-2 pt-0 pl-2">
                           <pre className="text-xs bg-surface-secondary rounded p-2 overflow-x-auto text-text-muted">
                             {JSON.stringify(log.details, null, 2)}
@@ -132,7 +132,7 @@ export default function AuditPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
