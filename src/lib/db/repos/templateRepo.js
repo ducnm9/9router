@@ -7,7 +7,10 @@ const SCOPE = 'templates';
 export async function getTemplates({ category } = {}) {
   const db = await getAdapter();
   const rows = db.all('SELECT * FROM kv WHERE scope = ?', [SCOPE]);
-  let templates = rows.map(r => ({ id: r.key, ...JSON.parse(r.value) }));
+  let templates = rows.flatMap(r => {
+    try { return [{ id: r.key, ...JSON.parse(r.value) }]; }
+    catch { return []; }
+  });
   if (category) templates = templates.filter(t => t.category === category);
   return templates.sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
 }
@@ -17,7 +20,8 @@ export async function getTemplateById(id) {
   const db = await getAdapter();
   const row = db.get('SELECT * FROM kv WHERE scope = ? AND key = ?', [SCOPE, id]);
   if (!row) return undefined;
-  return { id: row.key, ...JSON.parse(row.value) };
+  try { return { id: row.key, ...JSON.parse(row.value) }; }
+  catch { return undefined; }
 }
 
 export async function createTemplate({ name, content, category = 'general', variables = [] } = {}) {
