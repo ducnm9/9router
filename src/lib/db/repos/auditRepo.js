@@ -1,6 +1,11 @@
 // src/lib/db/repos/auditRepo.js
 import { getAdapter } from '../driver.js';
 
+function safeParseJson(str) {
+  if (!str) return null;
+  try { return JSON.parse(str); } catch { return str; }
+}
+
 /**
  * Log an audit event (fire-and-forget safe — never throws to caller).
  */
@@ -47,7 +52,7 @@ export async function getAuditLogs({ action, resource, userId, limit = 50, offse
   const rows = db.all(sql, params);
   return rows.map(row => ({
     ...row,
-    details: row.details ? JSON.parse(row.details) : null,
+    details: safeParseJson(row.details),
   }));
 }
 
