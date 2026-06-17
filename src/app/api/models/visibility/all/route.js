@@ -8,6 +8,7 @@ import {
   FREE_PROVIDERS,
 } from "@/shared/constants/providers";
 import { getProviderConnections, getCombos, getModelAliases, getCustomModels } from "@/lib/localDb";
+import { FILTERS as MODELS_FETCHER_FILTERS } from "@/app/api/providers/suggested-models/filters";
 
 export const dynamic = "force-dynamic";
 
@@ -62,15 +63,7 @@ async function fetchCompatibleModelIds(connection) {
   }
 }
 
-// Filters for modelsFetcher types (same as /api/providers/suggested-models)
-const MODELS_FETCHER_FILTERS = {
-  "openrouter-free": (models) =>
-    models
-      .filter((m) => m.pricing?.prompt === "0" && m.pricing?.completion === "0" && m.context_length >= 200000)
-      .map((m) => ({ id: m.id, name: m.name })),
-  "opencode-free": (models) =>
-    models.filter((m) => m.id?.endsWith("-free")).map((m) => ({ id: m.id, name: m.id })),
-};
+// Filters for modelsFetcher types – imported from shared filters.js
 
 /**
  * Fetch models from a provider's modelsFetcher config (for passthrough/noAuth providers).
