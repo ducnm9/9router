@@ -384,17 +384,20 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
     if (shouldFallback) {
       log.warn("AUTH", `Account ${credentials.connectionName} unavailable (${result.status}), trying fallback`);
 
-      // Notify: fallback triggered (fire-and-forget)
-      getNotifier().send({
-        event: 'fallback_triggered',
-        from: `${provider}/${model}`,
-        to: `${provider}/${model}`,
-        reason: result.error || 'provider_unavailable'
-      }).catch(() => {});
-
       excludeConnectionIds.add(credentials.connectionId);
       lastError = result.error;
       lastStatus = result.status;
+
+      // Only notify if there is actually a next provider to fall back to
+      const nextCredential = await getProviderCredentials(provider, excludeConnectionIds, model);
+      if (nextCredential && !nextCredential.allRateLimited) {
+        getNotifier().send({
+          event: 'fallback_triggered',
+          from: `${provider}/${model}`,
+          reason: result.error || 'provider_unavailable'
+        }).catch(() => {});
+      }
+
       continue;
     }
 
