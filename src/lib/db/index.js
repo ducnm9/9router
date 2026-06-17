@@ -73,6 +73,11 @@ export {
   createUser, updateUser, deleteUser, findOrCreateFromOidc,
 } from "./repos/userRepo.js";
 
+// Audit log
+export {
+  logAuditEvent, getAuditLogs, getAuditLogsByUser, getAuditStats,
+} from "./repos/auditRepo.js";
+
 // Export/import full DB
 export async function exportDb() {
   const db = await getAdapter();
