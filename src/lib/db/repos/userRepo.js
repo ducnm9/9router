@@ -89,8 +89,12 @@ export async function findOrCreateFromOidc({ sub, email, name, picture } = {}) {
   }
 
   // Create new — first user gets admin
-  const allUsers = await getUsers();
-  const role = allUsers.length === 0 ? 'admin' : 'member';
+  // Use COUNT rather than fetching all rows to reduce the TOCTOU window; with
+  // SQLite's single-writer model the count and the subsequent INSERT are
+  // effectively serialized through the adapter.
+  const db = await getAdapter();
+  const countResult = db.get('SELECT COUNT(*) as cnt FROM users', []);
+  const role = (countResult?.cnt === 0) ? 'admin' : 'member';
   try {
     return await createUser({ email, name, role, oidcSub: sub, avatarUrl: picture });
   } catch (err) {
