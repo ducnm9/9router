@@ -30,6 +30,7 @@ const navItems = [
   { href: "/dashboard/users", label: "Users", icon: "group" },
   { href: "/dashboard/audit", label: "Audit Log", icon: "history" },
   { href: "/dashboard/templates", label: "Templates", icon: "article" },
+  { href: "/dashboard/plugins", label: "Plugins", icon: "extension" },
 ];
 
 const debugItems = [
