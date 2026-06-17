@@ -29,6 +29,7 @@ const navItems = [
   { href: "/dashboard/cli-tools", label: "CLI Tools", icon: "terminal" },
   { href: "/dashboard/users", label: "Users", icon: "group" },
   { href: "/dashboard/audit", label: "Audit Log", icon: "history" },
+  { href: "/dashboard/templates", label: "Templates", icon: "article" },
 ];
 
 const debugItems = [
