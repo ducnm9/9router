@@ -154,6 +154,14 @@ export async function handleChat(request, clientRawRequest = null) {
   if (settings.rateLimitEnabled) {
     const clientIp = getClientIp(request);
 
+    // Sync singleton config from DB settings (in case they changed)
+    if (settings.rateLimitPerKey && settings.rateLimitPerKey !== apiKeyLimiter.maxRequests) {
+      apiKeyLimiter.reconfigure({ maxRequests: settings.rateLimitPerKey });
+    }
+    if (settings.rateLimitPerIp && settings.rateLimitPerIp !== ipLimiter.maxRequests) {
+      ipLimiter.reconfigure({ maxRequests: settings.rateLimitPerIp });
+    }
+
     // Per-IP check
     const ipResult = ipLimiter.check(clientIp);
     if (!ipResult.allowed) {
@@ -238,16 +246,11 @@ export async function handleChat(request, clientRawRequest = null) {
           );
         }
 
-        // Store quota warning info for response headers
+        // Fire quota warning notification if approaching limit
+        // Note: quota warning is delivered via webhook/notification only.
+        // SSE streaming responses don't support post-hoc header injection,
+        // so no X-Quota-Warning header is added to the response.
         if (quotaResult.warning) {
-          request.__quotaWarning = {
-            tokensUsed: quotaResult.usage.totalTokens,
-            tokensLimit: quotaResult.limit.maxTokens,
-            costUsed: quotaResult.usage.totalCost,
-            costLimit: quotaResult.limit.maxCost,
-            resetsAt: quotaResult.resetsAt,
-          };
-
           // Fire budget warning notification (non-blocking)
           getNotifier().send({
             event: 'quota_warning',
@@ -273,14 +276,13 @@ export async function handleChat(request, clientRawRequest = null) {
   let _cacheKey = null;
   if (settings.cacheEnabled && !body.stream) {
     const cache = getRequestCache();
-    if (settings.cacheMaxSize && cache.maxSize !== settings.cacheMaxSize) {
-      cache.maxSize = settings.cacheMaxSize;
-    }
-    if (settings.cacheTtlMinutes) {
-      const ttlMs = settings.cacheTtlMinutes * 60 * 1000;
-      if (cache.ttlMs !== ttlMs) {
-        cache.ttlMs = ttlMs;
-      }
+    // Sync cache config from settings if changed
+    const newTtlMs = (settings.cacheTtlMinutes ?? 5) * 60 * 1000;
+    if (cache.maxSize !== (settings.cacheMaxSize ?? 500) || cache.ttlMs !== newTtlMs) {
+      cache.reconfigure({
+        maxSize: settings.cacheMaxSize ?? 500,
+        ttlMs: newTtlMs
+      });
     }
     _cacheKey = cache.buildKey(body);
     if (_cacheKey) {

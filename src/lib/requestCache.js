@@ -86,6 +86,11 @@ export class RequestCache {
     };
   }
 
+  reconfigure({ maxSize, ttlMs } = {}) {
+    if (maxSize != null && maxSize > 0) this.maxSize = maxSize;
+    if (ttlMs != null && ttlMs > 0) this.ttlMs = ttlMs;
+  }
+
   clear() {
     this.cache.clear();
     this.hits = 0;

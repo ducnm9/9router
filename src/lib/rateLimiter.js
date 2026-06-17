@@ -72,6 +72,11 @@ export class RateLimiter {
     }
   }
 
+  reconfigure({ windowMs, maxRequests } = {}) {
+    if (windowMs != null && windowMs > 0) this.windowMs = windowMs;
+    if (maxRequests != null && maxRequests > 0) this.maxRequests = maxRequests;
+  }
+
   destroy() {
     if (this._cleanupInterval) clearInterval(this._cleanupInterval);
     this.windows.clear();
