@@ -113,6 +113,13 @@ export default function UsersPage() {
         </Button>
       </div>
 
+      <div className="mb-4 p-3 bg-info/10 text-text-muted rounded-lg text-sm border border-info/20">
+        <strong className="text-text-main">OIDC mode required.</strong>{" "}
+        Users listed here login via your configured OIDC provider (Google, GitHub, etc.).
+        In password mode, only the shared dashboard password is used and this list has no effect.
+        To enable OIDC, configure it in Settings &gt; Auth Mode.
+      </div>
+
       {error && (
         <div className="mb-4 p-3 bg-error/10 text-error rounded-lg text-sm">{error}</div>
       )}
