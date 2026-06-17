@@ -10,6 +10,7 @@ import {
   verifyOidcIdToken,
 } from "@/lib/auth/oidc";
 import { setDashboardAuthCookie } from "@/lib/auth/dashboardSession";
+import { findOrCreateFromOidc } from "@/lib/db/repos/userRepo.js";
 
 function clearOidcCookies(cookieStore) {
   cookieStore.delete("oidc_state");
@@ -72,11 +73,21 @@ export async function GET(request) {
     });
 
     clearOidcCookies(cookieStore);
+
+    const dbUser = await findOrCreateFromOidc({
+      sub: payload.sub,
+      email: pickOidcEmail(payload) || null,
+      name: pickOidcDisplayName(payload),
+      picture: payload.picture || null,
+    });
+
     await setDashboardAuthCookie(cookieStore, request, {
       oidc: true,
       oidcSub: payload.sub || null,
       oidcEmail: pickOidcEmail(payload) || null,
       oidcName: pickOidcDisplayName(payload),
+      userId: dbUser.id,
+      role: dbUser.role,
     });
 
     return NextResponse.redirect(new URL("/dashboard", getPublicOrigin(request)));

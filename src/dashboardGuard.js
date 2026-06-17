@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getSettings, validateApiKey } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
-import { verifyDashboardAuthToken } from "@/lib/auth/dashboardSession";
+import { verifyDashboardAuthToken, getDashboardAuthSession } from "@/lib/auth/dashboardSession";
+import { canAccessRoute } from "@/lib/rbac";
 
 const CLI_TOKEN_HEADER = "x-9r-cli-token";
 const CLI_TOKEN_SALT = "9r-cli-auth";
@@ -195,8 +196,30 @@ export async function proxy(request) {
   // Deny-by-default for /api/* — public allow-list bypasses, everything else requires auth.
   if (pathname.startsWith("/api/")) {
     if (isPublicApi(pathname)) return NextResponse.next();
-    if (await hasValidCliToken(request) || await isAuthenticated(request))
+
+    // CLI token has full access — skip RBAC
+    if (await hasValidCliToken(request)) return NextResponse.next();
+
+    if (await isAuthenticated(request)) {
+      // RBAC: resolve role from JWT session.
+      // Password sessions carry role:'admin' in the JWT.
+      // OIDC sessions carry role from the DB user.
+      // requireLogin=false (no JWT) → treat as admin (open system).
+      const token = request.cookies.get("auth_token")?.value;
+      const session = token ? await getDashboardAuthSession(token) : null;
+      const userRole = session
+        ? (session.role || (session.oidcSub ? null : "admin"))
+        : "admin"; // requireLogin=false → open system → admin
+
+      if (!canAccessRoute(userRole, pathname)) {
+        return NextResponse.json(
+          { error: "Forbidden: insufficient permissions" },
+          { status: 403 }
+        );
+      }
       return NextResponse.next();
+    }
+
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
