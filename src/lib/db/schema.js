@@ -80,9 +80,42 @@ export const TABLES = {
       isActive: "INTEGER DEFAULT 1",
       quota: "TEXT",
       expiresAt: "TEXT DEFAULT NULL",
+      userId: "TEXT REFERENCES users(id)",
       createdAt: "TEXT NOT NULL",
     },
     indexes: ["CREATE INDEX IF NOT EXISTS idx_ak_key ON apiKeys(key)"],
+  },
+  users: {
+    columns: {
+      id: "TEXT PRIMARY KEY",
+      email: "TEXT UNIQUE",
+      name: "TEXT",
+      role: "TEXT NOT NULL DEFAULT 'member'",
+      oidcSub: "TEXT UNIQUE",
+      avatarUrl: "TEXT",
+      lastLoginAt: "TEXT",
+      createdAt: "TEXT NOT NULL DEFAULT (datetime('now'))",
+      updatedAt: "TEXT NOT NULL DEFAULT (datetime('now'))",
+      isActive: "INTEGER NOT NULL DEFAULT 1",
+    },
+  },
+  auditLog: {
+    columns: {
+      id: "INTEGER PRIMARY KEY AUTOINCREMENT",
+      timestamp: "TEXT NOT NULL DEFAULT (datetime('now'))",
+      userId: "TEXT REFERENCES users(id)",
+      action: "TEXT NOT NULL",
+      resource: "TEXT",
+      resourceId: "TEXT",
+      details: "TEXT",
+      ip: "TEXT",
+      userAgent: "TEXT",
+    },
+    indexes: [
+      "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON auditLog(timestamp)",
+      "CREATE INDEX IF NOT EXISTS idx_audit_userId ON auditLog(userId)",
+      "CREATE INDEX IF NOT EXISTS idx_audit_action ON auditLog(action)",
+    ],
   },
   combos: {
     columns: {
