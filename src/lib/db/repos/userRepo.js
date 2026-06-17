@@ -27,11 +27,18 @@ export async function createUser({ email, name, role = 'member', oidcSub, avatar
   const db = await getAdapter();
   const id = randomUUID();
   const now = new Date().toISOString();
-  db.run(
-    `INSERT INTO users (id, email, name, role, oidcSub, avatarUrl, createdAt, updatedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, email, name || null, role, oidcSub || null, avatarUrl || null, now, now]
-  );
+  try {
+    db.run(
+      `INSERT INTO users (id, email, name, role, oidcSub, avatarUrl, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, email, name || null, role, oidcSub || null, avatarUrl || null, now, now]
+    );
+  } catch (err) {
+    if (err.message?.includes('UNIQUE constraint failed: users.email')) {
+      throw new Error('createUser: email already exists');
+    }
+    throw err;
+  }
   return getUserById(id);
 }
 
@@ -84,5 +91,16 @@ export async function findOrCreateFromOidc({ sub, email, name, picture } = {}) {
   // Create new — first user gets admin
   const allUsers = await getUsers();
   const role = allUsers.length === 0 ? 'admin' : 'member';
-  return createUser({ email, name, role, oidcSub: sub, avatarUrl: picture });
+  try {
+    return await createUser({ email, name, role, oidcSub: sub, avatarUrl: picture });
+  } catch (err) {
+    if (err.message?.includes('email already exists') || err.message?.includes('UNIQUE constraint')) {
+      // Race condition — another request created the user; find and return it
+      const existing = sub ? await getUserByOidcSub(sub) : null;
+      if (existing) return existing;
+      if (email) return await getUserByEmail(email);
+      throw err;
+    }
+    throw err;
+  }
 }
