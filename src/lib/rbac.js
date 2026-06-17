@@ -44,8 +44,6 @@ const ROUTE_PERMISSIONS = [
   { pattern: /^\/api\/settings/,  permission: 'settings:write' },
   { pattern: /^\/api\/providers/, permission: 'providers:write' },
   { pattern: /^\/api\/keys/,      permission: 'keys:manage' },
-  { pattern: /^\/api\/v1\//,      permission: 'chat:use' },
-  { pattern: /^\/v1\//,           permission: 'chat:use' },
   { pattern: /^\/api\/usage/,     permission: 'usage:read:own' },
   { pattern: /^\/api\/combos/,    permission: 'combos:read' },
   { pattern: /^\/api\/models/,    permission: 'models:read' },

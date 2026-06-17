@@ -200,13 +200,16 @@ export async function proxy(request) {
     // CLI token has full access — skip RBAC
     if (await hasValidCliToken(request)) return NextResponse.next();
 
-    if (await isAuthenticated(request)) {
-      // RBAC: resolve role from JWT session.
-      // Password sessions carry role:'admin' in the JWT.
-      // OIDC sessions carry role from the DB user.
-      // requireLogin=false (no JWT) → treat as admin (open system).
-      const token = request.cookies.get("auth_token")?.value;
-      const session = token ? await getDashboardAuthSession(token) : null;
+    // RBAC: single JWT decode — getDashboardAuthSession returns null on invalid/missing token.
+    // Password sessions carry role:'admin' in the JWT.
+    // OIDC sessions carry role from the DB user.
+    // requireLogin=false (no JWT) → treat as admin (open system).
+    const token = request.cookies.get("auth_token")?.value;
+    const session = token ? await getDashboardAuthSession(token) : null;
+    const settings = await loadSettings();
+    const isAuthed = !!session || !!(settings && settings.requireLogin === false);
+
+    if (isAuthed) {
       const userRole = session
         ? (session.role || (session.oidcSub ? null : "admin"))
         : "admin"; // requireLogin=false → open system → admin

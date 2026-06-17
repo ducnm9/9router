@@ -75,7 +75,7 @@ export async function GET(request) {
     clearOidcCookies(cookieStore);
 
     const dbUser = await findOrCreateFromOidc({
-      sub: payload.sub,
+      sub: payload.sub || null,
       email: pickOidcEmail(payload) || null,
       name: pickOidcDisplayName(payload),
       picture: payload.picture || null,
