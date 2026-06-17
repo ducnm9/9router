@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteApiKey, getApiKeyById, updateApiKey } from "@/lib/localDb";
+import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 
 // GET /api/keys/[id] - Get single key
 export async function GET(request, { params }) {
@@ -34,6 +35,13 @@ export async function PUT(request, { params }) {
 
     const updated = await updateApiKey(id, updateData);
 
+    logAuditEvent({
+      action: 'key.updated',
+      resource: 'apiKey',
+      resourceId: id,
+      details: updateData
+    }).catch(() => {});
+
     return NextResponse.json({ key: updated });
   } catch (error) {
     console.log("Error updating key:", error);
@@ -50,6 +58,13 @@ export async function DELETE(request, { params }) {
     if (!deleted) {
       return NextResponse.json({ error: "Key not found" }, { status: 404 });
     }
+
+    logAuditEvent({
+      action: 'key.deleted',
+      resource: 'apiKey',
+      resourceId: id,
+      details: { name: deleted.name ?? id }
+    }).catch(() => {});
 
     return NextResponse.json({ message: "Key deleted successfully" });
   } catch (error) {

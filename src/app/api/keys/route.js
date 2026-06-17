@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getApiKeys, createApiKey } from "@/lib/localDb";
 import { getConsistentMachineId } from "@/shared/utils/machineId";
+import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,13 @@ export async function POST(request) {
     // Always get machineId from server
     const machineId = await getConsistentMachineId();
     const apiKey = await createApiKey(name, machineId, { expiresAt: expiresAt ?? null });
+
+    logAuditEvent({
+      action: 'key.created',
+      resource: 'apiKey',
+      resourceId: apiKey.id,
+      details: { name: apiKey.name }
+    }).catch(() => {});
 
     return NextResponse.json({
       key: apiKey.key,

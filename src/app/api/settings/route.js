@@ -3,6 +3,7 @@ import { getSettings, updateSettings } from "@/lib/localDb";
 import { applyOutboundProxyEnv } from "@/lib/network/outboundProxy";
 import { resetComboRotation } from "open-sse/services/combo.js";
 import bcrypt from "bcryptjs";
+import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -71,6 +72,13 @@ export async function PATCH(request) {
     }
 
     const settings = await updateSettings(body);
+
+    // Non-blocking audit log (fire-and-forget)
+    logAuditEvent({
+      action: 'settings.updated',
+      resource: 'settings',
+      details: { changedFields: Object.keys(body) }
+    }).catch(() => {});
 
     // Apply outbound proxy settings immediately (no restart required)
     if (

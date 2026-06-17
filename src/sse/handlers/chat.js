@@ -24,6 +24,7 @@ import { detectFormatByEndpoint } from "open-sse/translator/formats.js";
 import * as log from "../utils/logger.js";
 import { updateProviderCredentials, checkAndRefreshToken } from "../services/tokenRefresh.js";
 import { getProjectIdForConnection } from "open-sse/services/projectId.js";
+import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 
 /**
  * Handle chat completion request
@@ -353,7 +354,21 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       }
     });
 
-    if (result.success) return result.response;
+    if (result.success) {
+      // Non-blocking audit log (fire-and-forget)
+      logAuditEvent({
+        action: 'chat.request',
+        resource: 'model',
+        resourceId: `${provider}/${model}`,
+        details: {
+          provider,
+          tokensUsed: result.usage?.total_tokens || result.usage?.totalTokens,
+          stream: !!body?.stream
+        },
+        ip: request ? getClientIp(request) : undefined
+      }).catch(() => {});
+      return result.response;
+    }
 
     // Mark account unavailable (auto-calculates cooldown with exponential backoff, or precise resetsAtMs)
     const { shouldFallback } = await markAccountUnavailable(credentials.connectionId, result.status, result.error, provider, model, result.resetsAtMs);
