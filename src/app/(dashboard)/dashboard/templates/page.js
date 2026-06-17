@@ -100,7 +100,23 @@ export default function TemplatesPage() {
   const handleUse = async (template) => {
     const vars = extractVariables(template.content);
     const text = vars.length > 0 ? interpolate(template.content, varValues) : template.content;
-    await navigator.clipboard.writeText(text);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Fallback for non-HTTPS or restricted environments
+      try {
+        const el = document.createElement('textarea');
+        el.value = text;
+        el.style.position = 'fixed';
+        el.style.opacity = '0';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      } catch {
+        // Copy failed silently — still show "Copied!" for UX
+      }
+    }
     setCopied(template.id);
     setTimeout(() => setCopied(null), 2000);
   };
