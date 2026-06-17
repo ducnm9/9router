@@ -51,6 +51,10 @@ describe('RBAC', () => {
     expect(canAccessRoute('member', '/api/audit')).toBe(false);
   });
 
+  it('canAccessRoute member can access /api/keys', () => {
+    expect(canAccessRoute('member', '/api/keys')).toBe(true);
+  });
+
   it('canAccessRoute member can use chat API', () => {
     expect(canAccessRoute('member', '/api/v1/chat/completions')).toBe(true);
     expect(canAccessRoute('member', '/api/v1/models')).toBe(true);
