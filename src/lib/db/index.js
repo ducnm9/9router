@@ -78,6 +78,12 @@ export {
   logAuditEvent, getAuditLogs, getAuditLogsByUser, getAuditStats,
 } from "./repos/auditRepo.js";
 
+// Prompt templates
+export {
+  getTemplates, getTemplateById,
+  createTemplate, updateTemplate, deleteTemplate,
+} from "./repos/templateRepo.js";
+
 // Export/import full DB
 export async function exportDb() {
   const db = await getAdapter();
