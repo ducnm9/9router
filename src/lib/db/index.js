@@ -67,6 +67,12 @@ export {
   saveRequestDetail, getRequestDetails, getRequestDetailById,
 } from "./repos/requestDetailsRepo.js";
 
+// Users
+export {
+  getUsers, getUserById, getUserByEmail, getUserByOidcSub,
+  createUser, updateUser, deleteUser, findOrCreateFromOidc,
+} from "./repos/userRepo.js";
+
 // Export/import full DB
 export async function exportDb() {
   const db = await getAdapter();
