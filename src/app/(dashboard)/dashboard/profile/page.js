@@ -65,6 +65,14 @@ export default function ProfilePage() {
   const [rateLimitPerKey, setRateLimitPerKey] = useState(60);
   const [rateLimitPerIp, setRateLimitPerIp] = useState(120);
 
+  // Routing Strategy & Cache
+  const [routingStrategy, setRoutingStrategy] = useState('priority');
+  const [skipUnhealthyProviders, setSkipUnhealthyProviders] = useState(false);
+  const [cacheEnabled, setCacheEnabled] = useState(false);
+  const [cacheTtlMinutes, setCacheTtlMinutes] = useState(5);
+  const [cacheMaxSize, setCacheMaxSize] = useState(500);
+  const [cacheStats, setCacheStats] = useState(null);
+
   // Notifications
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationChannels, setNotificationChannels] = useState([]);
@@ -95,12 +103,19 @@ export default function ProfilePage() {
         setRateLimitEnabled(data?.rateLimitEnabled ?? false);
         setRateLimitPerKey(data?.rateLimitPerKey ?? 60);
         setRateLimitPerIp(data?.rateLimitPerIp ?? 120);
+        setRoutingStrategy(data.routingStrategy ?? 'priority');
+        setSkipUnhealthyProviders(data.skipUnhealthyProviders ?? false);
+        setCacheEnabled(data.cacheEnabled ?? false);
+        setCacheTtlMinutes(data.cacheTtlMinutes ?? 5);
+        setCacheMaxSize(data.cacheMaxSize ?? 500);
         setLoading(false);
       })
       .catch((err) => {
         console.error("Failed to fetch settings:", err);
         setLoading(false);
       });
+
+    fetch("/api/cache").then(r => r.ok ? r.json() : null).then(d => d && setCacheStats(d)).catch(() => {});
 
     fetch("/api/settings/notifications")
       .then((res) => res.ok ? res.json() : null)
@@ -594,6 +609,11 @@ export default function ProfilePage() {
     } catch (err) {
       console.error("Failed to update setting:", err);
     }
+  };
+
+  const handleClearCache = async () => {
+    await fetch('/api/cache', { method: 'DELETE' });
+    fetch('/api/cache').then(r => r.ok ? r.json() : null).then(d => d && setCacheStats(d));
   };
 
   const handleNotificationsEnabled = async (v) => {
@@ -1263,6 +1283,103 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
+        </Card>
+
+        {/* Routing Strategy */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+              <span className="material-symbols-outlined text-[20px]">route</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold">Routing Strategy</h3>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div>
+              <p className="font-medium text-sm mb-1">Provider Selection Strategy</p>
+              <p className="text-xs text-text-muted mb-2">How providers in a combo are ordered for each request</p>
+              <select
+                value={routingStrategy}
+                onChange={(e) => { setRoutingStrategy(e.target.value); handleSettingChange('routingStrategy', e.target.value); }}
+                className="px-3 py-2 text-sm border rounded-lg bg-surface-secondary border-border w-full sm:w-64"
+              >
+                <option value="priority">Priority — use combo order (default)</option>
+                <option value="latency">Latency — fastest provider first</option>
+                <option value="balanced">Balanced — blend priority + health</option>
+              </select>
+            </div>
+
+            <div className="flex items-start sm:items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm">Skip Unhealthy Providers</p>
+                <p className="text-xs text-text-muted">Automatically skip providers with too many consecutive failures</p>
+              </div>
+              <Toggle
+                checked={skipUnhealthyProviders}
+                onChange={(v) => { setSkipUnhealthyProviders(v); handleSettingChange('skipUnhealthyProviders', v); }}
+                disabled={loading}
+              />
+            </div>
+          </div>
+        </Card>
+
+        {/* Response Cache */}
+        <Card>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 rounded-lg bg-primary/10 text-primary shrink-0">
+              <span className="material-symbols-outlined text-[20px]">cached</span>
+            </div>
+            <h3 className="text-base sm:text-lg font-semibold">Response Cache</h3>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <div className="flex items-start sm:items-center justify-between gap-4">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm sm:text-base">Enable Response Cache</p>
+                <p className="text-xs sm:text-sm text-text-muted">Cache identical non-streaming requests (temperature=0) to save tokens</p>
+              </div>
+              <Toggle
+                checked={cacheEnabled}
+                onChange={(v) => { setCacheEnabled(v); handleSettingChange('cacheEnabled', v); }}
+                disabled={loading}
+              />
+            </div>
+
+            {cacheEnabled && (
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between gap-4">
+                  <p className="font-medium text-sm">Cache TTL (minutes)</p>
+                  <input
+                    type="number" min="1" max="60"
+                    value={cacheTtlMinutes}
+                    onChange={(e) => setCacheTtlMinutes(Math.max(1, Number(e.target.value) || 1))}
+                    onBlur={() => handleSettingChange('cacheTtlMinutes', cacheTtlMinutes)}
+                    className="w-20 px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <p className="font-medium text-sm">Max cache entries</p>
+                  <input
+                    type="number" min="10" max="10000"
+                    value={cacheMaxSize}
+                    onChange={(e) => setCacheMaxSize(Math.max(10, Number(e.target.value) || 10))}
+                    onBlur={() => handleSettingChange('cacheMaxSize', cacheMaxSize)}
+                    className="w-20 px-2 py-1 text-sm border rounded-md bg-surface-secondary border-border"
+                  />
+                </div>
+
+                {cacheStats && (
+                  <div className="mt-1 p-3 bg-surface-secondary rounded-lg text-xs flex flex-wrap gap-x-4 gap-y-1">
+                    <span>Entries: <strong>{cacheStats.size}/{cacheStats.maxSize}</strong></span>
+                    <span>Hit rate: <strong>{((cacheStats.hitRate || 0) * 100).toFixed(1)}%</strong></span>
+                    <span>Hits: <strong>{cacheStats.hits}</strong></span>
+                    <span>Misses: <strong>{cacheStats.misses}</strong></span>
+                    <button onClick={handleClearCache} className="text-error hover:underline ml-auto">Clear cache</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </Card>
 
         {/* Notifications Section */}
