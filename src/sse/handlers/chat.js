@@ -526,13 +526,16 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
     // Mark account unavailable (auto-calculates cooldown with exponential backoff, or precise resetsAtMs)
     const { shouldFallback } = await markAccountUnavailable(credentials.connectionId, result.status, result.error, provider, model, result.resetsAtMs);
 
-    // Notify: provider account is down
-    getNotifier().send({
-      event: 'provider_down',
-      provider: `${provider}/${model}`,
-      error: result.error || 'request failed',
-      failures: 1
-    }).catch(() => {});
+    // Notify: provider account is down (only after crossing unhealthy threshold)
+    const _health = getHealthTracker().getHealth(provider);
+    if (_health.consecutiveFailures >= 3) {
+      getNotifier().send({
+        event: 'provider_down',
+        provider: `${provider}/${model}`,
+        error: result.error || 'request failed',
+        failures: _health.consecutiveFailures
+      }).catch(() => {});
+    }
 
     if (shouldFallback) {
       log.warn("AUTH", `Account ${credentials.connectionName} unavailable (${result.status}), trying fallback`);
@@ -547,6 +550,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
         getNotifier().send({
           event: 'fallback_triggered',
           from: `${provider}/${model}`,
+          to: `${provider}/${model}`,
           reason: result.error || 'provider_unavailable'
         }).catch(() => {});
       }
