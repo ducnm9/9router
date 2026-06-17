@@ -55,6 +55,21 @@ try { ensureSqliteRuntime({ silent: true }); } catch {}
 // Self-heal tray runtime (systray for macOS/Linux only). Windows skipped.
 try { ensureTrayRuntime({ silent: true }); } catch {}
 
+// Sub-command: bench — load test the 9Router endpoint (runs standalone, no server spawn)
+if (args[0] === 'bench') {
+  const { parseArgs, printHelp, runBench } = require('./src/commands/bench');
+  const opts = parseArgs(args.slice(1));
+  if (opts.help) {
+    printHelp(pkg.name);
+    process.exit(0);
+  }
+  runBench(opts).then(() => process.exit(0)).catch(err => {
+    console.error('bench error:', err.message);
+    process.exit(1);
+  });
+  return; // prevent fall-through to server startup
+}
+
 // Configuration constants
 const APP_NAME = pkg.name; // Use from package.json
 const INSTALL_CMD_LATEST = `npm i -g ${APP_NAME}@latest --prefer-online`;
