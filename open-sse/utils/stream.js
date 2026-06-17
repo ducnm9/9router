@@ -66,6 +66,7 @@ export function createSSEStream(options = {}) {
   let ttftAt = null;
   let sseLineCount = 0;
   let sseEmittedCount = 0;
+  const streamCounter = new StreamTokenCounter(); // tracks output chunks for trailing token estimate
   const eventTypeCounts = {};
 
   // Track Responses API event framing for same-format passthrough (codex)
@@ -140,10 +141,12 @@ export function createSSEStream(options = {}) {
               if (content && typeof content === "string") {
                 totalContentLength += content.length;
                 accumulatedContent += content;
+                streamCounter.countChunk(content);
               }
               if (reasoning && typeof reasoning === "string") {
                 totalContentLength += reasoning.length;
                 accumulatedThinking += reasoning;
+                streamCounter.countChunk(reasoning);
               }
 
               const extracted = extractUsage(parsed);
@@ -223,22 +226,26 @@ export function createSSEStream(options = {}) {
         if (parsed.delta?.text) {
           totalContentLength += parsed.delta.text.length;
           accumulatedContent += parsed.delta.text;
+          streamCounter.countChunk(parsed.delta.text);
         }
         // Claude format - thinking
         if (parsed.delta?.thinking) {
           totalContentLength += parsed.delta.thinking.length;
           accumulatedThinking += parsed.delta.thinking;
+          streamCounter.countChunk(parsed.delta.thinking);
         }
         
         // OpenAI format - content
         if (parsed.choices?.[0]?.delta?.content) {
           totalContentLength += parsed.choices[0].delta.content.length;
           accumulatedContent += parsed.choices[0].delta.content;
+          streamCounter.countChunk(parsed.choices[0].delta.content);
         }
         // OpenAI format - reasoning
         if (parsed.choices?.[0]?.delta?.reasoning_content) {
           totalContentLength += parsed.choices[0].delta.reasoning_content.length;
           accumulatedThinking += parsed.choices[0].delta.reasoning_content;
+          streamCounter.countChunk(parsed.choices[0].delta.reasoning_content);
         }
         
         // Gemini format
@@ -246,6 +253,7 @@ export function createSSEStream(options = {}) {
           for (const part of parsed.candidates[0].content.parts) {
             if (part.text && typeof part.text === "string") {
               totalContentLength += part.text.length;
+              streamCounter.countChunk(part.text);
               // Check if this is thinking content
               if (part.thought === true) {
                 accumulatedThinking += part.text;
@@ -351,7 +359,8 @@ export function createSSEStream(options = {}) {
           // Emit lightweight token estimate as a trailing SSE event
           const ptCounter = new StreamTokenCounter();
           ptCounter.countInput(body?.messages);
-          ptCounter.outputChars = totalContentLength;
+          ptCounter.outputChars = streamCounter.outputChars;
+          ptCounter.chunks = streamCounter.chunks;
           controller.enqueue(sharedEncoder.encode(ptCounter.toSSEEvent()));
 
           if (onStreamComplete) {
@@ -422,7 +431,8 @@ export function createSSEStream(options = {}) {
         // Emit lightweight token estimate as a trailing SSE event
         const txCounter = new StreamTokenCounter();
         txCounter.countInput(body?.messages);
-        txCounter.outputChars = totalContentLength;
+        txCounter.outputChars = streamCounter.outputChars;
+        txCounter.chunks = streamCounter.chunks;
         controller.enqueue(sharedEncoder.encode(txCounter.toSSEEvent()));
 
         if (!hasValidUsage(state?.usage) && totalContentLength > 0) {
