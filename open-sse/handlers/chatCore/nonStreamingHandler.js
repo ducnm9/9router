@@ -8,6 +8,7 @@ import { parseSSEToOpenAIResponse } from "./sseToJsonHandler.js";
 import { buildRequestDetail, extractRequestConfig, extractUsageFromResponse, saveUsageStats } from "./requestDetail.js";
 import { appendRequestLog, saveRequestDetail } from "@/lib/usageDb.js";
 import { decloakToolNames } from "../../utils/claudeCloaking.js";
+import { StreamTokenCounter } from "../../utils/tokenCounter.js";
 
 /**
  * Translate non-streaming response body from provider format → OpenAI format.
@@ -221,10 +222,19 @@ export async function handleNonStreamingResponse({ providerResponse, provider, m
     console.error("[RequestDetail] Failed to save:", err.message);
   });
 
+  const tokenCounter = new StreamTokenCounter();
+  tokenCounter.countInput(body?.messages);
+  const responseContent = translatedResponse?.choices?.[0]?.message?.content || translatedResponse?.content || "";
+  tokenCounter.countChunk(responseContent);
+
   return {
     success: true,
     response: new Response(JSON.stringify(translatedResponse), {
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "X-Token-Usage": tokenCounter.toHeader()
+      }
     })
   };
 }

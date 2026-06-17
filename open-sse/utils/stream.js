@@ -5,6 +5,7 @@ import { extractUsage, hasValidUsage, estimateUsage, logUsage, addBufferToUsage,
 import { parseSSELine, hasValuableContent, fixInvalidId, formatSSE } from "./streamHelpers.js";
 import { getOpenAIResponsesEventName, isOpenAIResponsesTerminalEvent, formatIncompleteOpenAIResponsesStreamFailure } from "./responsesStreamHelpers.js";
 import { dbg, isDebugEnabled } from "./debugLog.js";
+import { StreamTokenCounter } from "./tokenCounter.js";
 
 import { SSE_DONE, SSE_HEADERS, SSE_HEADERS_NO_BUFFER } from "./sseConstants.js";
 
@@ -347,6 +348,12 @@ export function createSSEStream(options = {}) {
           reqLogger?.appendConvertedChunk?.(doneOutput);
           controller.enqueue(sharedEncoder.encode(doneOutput));
 
+          // Emit lightweight token estimate as a trailing SSE event
+          const ptCounter = new StreamTokenCounter();
+          ptCounter.countInput(body?.messages);
+          ptCounter.outputChars = totalContentLength;
+          controller.enqueue(sharedEncoder.encode(ptCounter.toSSEEvent()));
+
           if (onStreamComplete) {
             onStreamComplete({
               content: accumulatedContent,
@@ -411,6 +418,12 @@ export function createSSEStream(options = {}) {
           reqLogger?.appendConvertedChunk?.(doneOutput);
           controller.enqueue(sharedEncoder.encode(doneOutput));
         }
+
+        // Emit lightweight token estimate as a trailing SSE event
+        const txCounter = new StreamTokenCounter();
+        txCounter.countInput(body?.messages);
+        txCounter.outputChars = totalContentLength;
+        controller.enqueue(sharedEncoder.encode(txCounter.toSSEEvent()));
 
         if (!hasValidUsage(state?.usage) && totalContentLength > 0) {
           state.usage = estimateUsage(body, totalContentLength, sourceFormat);
