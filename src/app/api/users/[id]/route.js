@@ -1,12 +1,17 @@
 // src/app/api/users/[id]/route.js
 import { NextResponse } from "next/server";
-import { getUserById, updateUser, deleteUser } from "@/lib/db/index.js";
+import { getUserById, updateUser, deleteUser, getUsers } from "@/lib/db/index.js";
 import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 import { getRoleNames } from "@/lib/rbac.js";
+import { getSessionRole } from "@/lib/auth/getSessionRole.js";
 
 // GET /api/users/[id] - Get single user
 export async function GET(request, { params }) {
   try {
+    const sessionRole = await getSessionRole();
+    if (sessionRole !== "admin") {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
     const { id } = await params;
     const user = await getUserById(id);
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -21,6 +26,10 @@ export async function GET(request, { params }) {
 // PUT /api/users/[id] - Update user
 export async function PUT(request, { params }) {
   try {
+    const sessionRole = await getSessionRole();
+    if (sessionRole !== "admin") {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
     const { id } = await params;
     const user = await getUserById(id);
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
@@ -39,6 +48,17 @@ export async function PUT(request, { params }) {
           { error: `role must be one of: ${validRoles.join(", ")}` },
           { status: 400 }
         );
+      }
+      // Prevent removing admin role from the last admin
+      if (filtered.role !== "admin" && user.role === "admin") {
+        const allUsers = await getUsers();
+        const adminCount = allUsers.filter(u => u.role === "admin").length;
+        if (adminCount <= 1) {
+          return NextResponse.json(
+            { error: "Cannot remove admin role from the last admin" },
+            { status: 409 }
+          );
+        }
       }
     }
 
@@ -60,9 +80,26 @@ export async function PUT(request, { params }) {
 // DELETE /api/users/[id] - Delete user
 export async function DELETE(request, { params }) {
   try {
+    const sessionRole = await getSessionRole();
+    if (sessionRole !== "admin") {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
     const { id } = await params;
     const user = await getUserById(id);
     if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
+
+    // Prevent deleting the last admin
+    if (user.role === "admin") {
+      const allUsers = await getUsers();
+      const adminCount = allUsers.filter(u => u.role === "admin").length;
+      if (adminCount <= 1) {
+        return NextResponse.json(
+          { error: "Cannot delete the last admin user" },
+          { status: 409 }
+        );
+      }
+    }
+
     await deleteUser(id);
     await logAuditEvent({
       action: "user.deleted",

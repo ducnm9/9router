@@ -1,12 +1,17 @@
 // src/app/api/audit/route.js
 import { NextResponse } from "next/server";
 import { getAuditLogs, getAuditStats } from "@/lib/db/repos/auditRepo.js";
+import { getSessionRole } from "@/lib/auth/getSessionRole.js";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/audit - Query audit logs
 export async function GET(request) {
   try {
+    const sessionRole = await getSessionRole();
+    if (sessionRole !== "admin") {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
     const url = new URL(request.url);
     const action = url.searchParams.get("action") || undefined;
     const resource = url.searchParams.get("resource") || undefined;

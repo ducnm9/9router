@@ -3,12 +3,17 @@ import { NextResponse } from "next/server";
 import { getUsers, createUser } from "@/lib/db/index.js";
 import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 import { getRoleNames } from "@/lib/rbac.js";
+import { getSessionRole } from "@/lib/auth/getSessionRole.js";
 
 export const dynamic = "force-dynamic";
 
 // GET /api/users - List all users
 export async function GET() {
   try {
+    const role = await getSessionRole();
+    if (role !== "admin") {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
     const users = await getUsers();
     // Never expose sensitive fields
     const safe = users.map(({ id, email, name, role, avatarUrl, lastLoginAt, createdAt, isActive }) => ({
@@ -24,18 +29,27 @@ export async function GET() {
 // POST /api/users - Create a new user
 export async function POST(request) {
   try {
-    const { email, name, role } = await request.json();
+    const role = await getSessionRole();
+    if (role !== "admin") {
+      return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+    }
+    const { email, name, role: newRole } = await request.json();
     if (!email) {
       return NextResponse.json({ error: "email is required" }, { status: 400 });
     }
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: "Invalid email format" }, { status: 400 });
+    }
     const validRoles = getRoleNames();
-    if (role && !validRoles.includes(role)) {
+    if (newRole && !validRoles.includes(newRole)) {
       return NextResponse.json(
         { error: `role must be one of: ${validRoles.join(", ")}` },
         { status: 400 }
       );
     }
-    const user = await createUser({ email, name, role: role || "member" });
+    const user = await createUser({ email, name, role: newRole || "member" });
     await logAuditEvent({
       action: "user.created",
       resource: "user",
