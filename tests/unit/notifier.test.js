@@ -54,6 +54,30 @@ describe('Notifier', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('formats provider_down message correctly', () => {
+    const msg = formatAlertMessage('slack', {
+      event: 'provider_down',
+      provider: 'claude-code',
+      error: 'Rate limit exceeded',
+      failures: 3
+    });
+    expect(msg.text).toContain('claude-code');
+    expect(msg.text).toContain('DOWN');
+    expect(msg.text).toContain('3');
+  });
+
+  it('formats fallback_triggered message correctly', () => {
+    const msg = formatAlertMessage('discord', {
+      event: 'fallback_triggered',
+      from: 'cc/claude-opus-4.7',
+      to: 'glm/glm-5',
+      reason: 'quota_exhausted'
+    });
+    expect(msg.content).toContain('cc/claude-opus-4.7');
+    expect(msg.content).toContain('glm/glm-5');
+    expect(msg.content).toContain('quota_exhausted');
+  });
+
   it('sends again after cooldown expires', async () => {
     vi.useFakeTimers();
     try {

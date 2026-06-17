@@ -65,28 +65,42 @@ export class Notifier {
 }
 
 export function formatAlertMessage(type, alert) {
-  const { event, keyName, usage, limit, unit = 'tokens' } = alert;
-  const isExceeded = event === 'budget_exceeded' || event === 'quota_exceeded';
-  const verb = isExceeded ? 'exceeded' : 'approaching limit';
-  const text = `[9Router] API key "${keyName || alert.keyId}" ${verb}: ${usage}/${limit} ${unit}`;
+  const { event } = alert;
 
-  switch (type) {
-    case 'slack':
-      return { text };
-    case 'discord':
-      return { content: text };
-    case 'telegram':
-      return { text, parse_mode: 'HTML' };
-    default:
-      return {
-        event,
-        keyName: keyName || alert.keyId,
-        usage,
-        limit,
-        unit,
-        message: text,
-        timestamp: new Date().toISOString(),
-      };
+  switch (event) {
+    case 'provider_down': {
+      const text = `[9Router] Provider "${alert.provider}" is DOWN. Error: ${alert.error || 'unknown'}. Consecutive failures: ${alert.failures ?? 1}`;
+      return type === 'slack' ? { text }
+        : type === 'discord' ? { content: text }
+        : type === 'telegram' ? { text, parse_mode: 'HTML' }
+        : { event: alert.event, provider: alert.provider, error: alert.error, failures: alert.failures, message: text, timestamp: new Date().toISOString() };
+    }
+    case 'fallback_triggered': {
+      const text = `[9Router] Fallback triggered: ${alert.from} → ${alert.to}. Reason: ${alert.reason || 'unknown'}`;
+      return type === 'slack' ? { text }
+        : type === 'discord' ? { content: text }
+        : type === 'telegram' ? { text, parse_mode: 'HTML' }
+        : { event: alert.event, from: alert.from, to: alert.to, reason: alert.reason, message: text, timestamp: new Date().toISOString() };
+    }
+    default: {
+      const { keyName, usage, limit, unit = 'tokens' } = alert;
+      const isExceeded = event === 'budget_exceeded' || event === 'quota_exceeded';
+      const verb = isExceeded ? 'exceeded' : 'approaching limit';
+      const text = `[9Router] API key "${keyName || alert.keyId}" ${verb}: ${usage}/${limit} ${unit}`;
+
+      return type === 'slack' ? { text }
+        : type === 'discord' ? { content: text }
+        : type === 'telegram' ? { text, parse_mode: 'HTML' }
+        : {
+            event,
+            keyName: keyName || alert.keyId,
+            usage,
+            limit,
+            unit,
+            message: text,
+            timestamp: new Date().toISOString(),
+          };
+    }
   }
 }
 
