@@ -273,6 +273,15 @@ export async function handleChat(request, clientRawRequest = null) {
   let _cacheKey = null;
   if (settings.cacheEnabled && !body.stream) {
     const cache = getRequestCache();
+    if (settings.cacheMaxSize && cache.maxSize !== settings.cacheMaxSize) {
+      cache.maxSize = settings.cacheMaxSize;
+    }
+    if (settings.cacheTtlMinutes) {
+      const ttlMs = settings.cacheTtlMinutes * 60 * 1000;
+      if (cache.ttlMs !== ttlMs) {
+        cache.ttlMs = ttlMs;
+      }
+    }
     _cacheKey = cache.buildKey(body);
     if (_cacheKey) {
       const cached = cache.get(_cacheKey);
