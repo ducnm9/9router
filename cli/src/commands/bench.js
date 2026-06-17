@@ -93,8 +93,10 @@ async function runBench(opts) {
 
   async function runOne() {
     const t0 = Date.now();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30000);
     try {
-      const res = await fetch(url, { method: 'POST', headers, body });
+      const res = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
       const elapsed = Date.now() - t0;
       const success = res.ok;
       if (!success) errors++;
@@ -102,6 +104,8 @@ async function runBench(opts) {
     } catch (err) {
       errors++;
       results.push({ status: 0, elapsed: Date.now() - t0, success: false, error: err.message });
+    } finally {
+      clearTimeout(timer);
     }
     completed++;
     process.stdout.write(`\r  Progress: ${completed}/${requests} requests (${errors} errors)`);
