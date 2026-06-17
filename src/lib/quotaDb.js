@@ -74,7 +74,7 @@ function writeQuotaFile(data) {
  * Get the counter for a specific key.
  * Returns zeroed counter if key is unknown or period has changed.
  */
-export function getCounter(keyId) {
+export async function getCounter(keyId) {
   const data = readQuotaFile();
   const counter = data.counters[keyId];
 

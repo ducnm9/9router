@@ -29,6 +29,39 @@ import { getHealthTracker } from "@/lib/providerHealth.js";
 import { getRequestCache } from "@/lib/requestCache.js";
 
 /**
+ * Shared combo dispatch: order models, log, and call handleComboChat.
+ * Used by both handleChat and handleSingleModelChat.
+ */
+async function _dispatchCombo({ body, comboModels, comboName, settings, clientRawRequest, request, apiKey }) {
+  const comboStrategies = settings.comboStrategies || {};
+  const comboStrategy = comboStrategies[comboName]?.fallbackStrategy || settings.comboStrategy || "fallback";
+  const comboStickyLimit = settings.comboStickyRoundRobinLimit;
+
+  let orderedModels = comboModels;
+  if (comboModels.length > 1) {
+    const tracker = getHealthTracker();
+
+    if (settings.skipUnhealthyProviders) {
+      const healthy = orderedModels.filter(m => tracker.getHealth(m.split('/')[0]).status !== 'unhealthy');
+      if (healthy.length > 0) orderedModels = healthy;
+    }
+
+    orderedModels = applyRoutingStrategy(orderedModels, settings, tracker);
+  }
+
+  log.info("CHAT", `Combo "${comboName}" with ${orderedModels.length} models (strategy: ${comboStrategy}, routing: ${settings.routingStrategy || 'priority'}, sticky: ${comboStickyLimit})`);
+  return handleComboChat({
+    body,
+    models: orderedModels,
+    handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
+    log,
+    comboName,
+    comboStrategy,
+    comboStickyLimit
+  });
+}
+
+/**
  * Apply routing strategy to combo models.
  * Returns a reordered copy — never mutates input.
  */
@@ -309,39 +342,7 @@ export async function handleChat(request, clientRawRequest = null) {
   // Check if model is a combo (has multiple models with fallback)
   const comboModels = await getComboModels(modelStr);
   if (comboModels) {
-    // Check for combo-specific strategy first, fallback to global
-    const comboStrategies = settings.comboStrategies || {};
-    const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
-    const comboStrategy = comboSpecificStrategy || settings.comboStrategy || "fallback";
-    
-    const comboStickyLimit = settings.comboStickyRoundRobinLimit;
-
-    // Apply routing strategy to combo model order
-    let orderedModels = comboModels;
-    if (comboModels.length > 1) {
-      const tracker = getHealthTracker();
-
-      // Skip unhealthy providers if enabled (only when alternatives exist)
-      if (settings.skipUnhealthyProviders) {
-        const healthy = orderedModels.filter(m => {
-          return tracker.getHealth(m.split('/')[0]).status !== 'unhealthy';
-        });
-        if (healthy.length > 0) orderedModels = healthy;
-      }
-
-      orderedModels = applyRoutingStrategy(orderedModels, settings, tracker);
-    }
-
-    log.info("CHAT", `Combo "${modelStr}" with ${orderedModels.length} models (strategy: ${comboStrategy}, routing: ${settings.routingStrategy || 'priority'}, sticky: ${comboStickyLimit})`);
-    const comboResponse = await handleComboChat({
-      body,
-      models: orderedModels,
-      handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
-      log,
-      comboName: modelStr,
-      comboStrategy,
-      comboStickyLimit
-    });
+    const comboResponse = await _dispatchCombo({ body, comboModels, comboName: modelStr, settings, clientRawRequest, request, apiKey });
     if (_cacheKey && comboResponse?.status === 200) {
       try {
         const data = await comboResponse.clone().json();
@@ -373,38 +374,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
     const comboModels = await getComboModels(modelStr);
     if (comboModels) {
       const chatSettings = await getSettings();
-      // Check for combo-specific strategy first, fallback to global
-      const comboStrategies = chatSettings.comboStrategies || {};
-      const comboSpecificStrategy = comboStrategies[modelStr]?.fallbackStrategy;
-      const comboStrategy = comboSpecificStrategy || chatSettings.comboStrategy || "fallback";
-      
-      const comboStickyLimit = chatSettings.comboStickyRoundRobinLimit;
-
-      // Apply routing strategy to combo model order
-      let orderedModels = comboModels;
-      if (comboModels.length > 1) {
-        const tracker = getHealthTracker();
-
-        if (chatSettings.skipUnhealthyProviders) {
-          const healthy = orderedModels.filter(m => {
-            return tracker.getHealth(m.split('/')[0]).status !== 'unhealthy';
-          });
-          if (healthy.length > 0) orderedModels = healthy;
-        }
-
-        orderedModels = applyRoutingStrategy(orderedModels, chatSettings, tracker);
-      }
-
-      log.info("CHAT", `Combo "${modelStr}" with ${orderedModels.length} models (strategy: ${comboStrategy}, routing: ${chatSettings.routingStrategy || 'priority'}, sticky: ${comboStickyLimit})`);
-      return handleComboChat({
-        body,
-        models: orderedModels,
-        handleSingleModel: (b, m) => handleSingleModelChat(b, m, clientRawRequest, request, apiKey),
-        log,
-        comboName: modelStr,
-        comboStrategy,
-        comboStickyLimit
-      });
+      return _dispatchCombo({ body, comboModels, comboName: modelStr, settings: chatSettings, clientRawRequest, request, apiKey });
     }
     log.warn("CHAT", "Invalid model format", { model: modelStr });
     return errorResponse(HTTP_STATUS.BAD_REQUEST, "Invalid model format");
@@ -549,8 +519,8 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
       if (nextCredential && !nextCredential.allRateLimited) {
         getNotifier().send({
           event: 'fallback_triggered',
-          from: `${provider}/${model}`,
-          to: `${provider}/${model}`,
+          from: credentials.connectionName || `${provider}/${model}`,
+          to: nextCredential.connectionName || `${provider}/${model}`,
           reason: result.error || 'provider_unavailable'
         }).catch(() => {});
       }

@@ -39,14 +39,20 @@ export const ROLES = {
  * First match wins. More specific patterns should come first.
  */
 const ROUTE_PERMISSIONS = [
-  { pattern: /^\/api\/users/,     permission: 'users:manage' },
-  { pattern: /^\/api\/audit/,     permission: 'audit:read' },
-  { pattern: /^\/api\/settings/,  permission: 'settings:write' },
-  { pattern: /^\/api\/providers/, permission: 'providers:write' },
-  { pattern: /^\/api\/keys/,      permission: 'keys:read:own' },
-  { pattern: /^\/api\/usage/,     permission: 'usage:read:own' },
-  { pattern: /^\/api\/combos/,    permission: 'combos:read' },
-  { pattern: /^\/api\/models/,    permission: 'models:read' },
+  { pattern: /^\/api\/users/,          permission: 'users:manage' },
+  { pattern: /^\/api\/audit/,          permission: 'audit:read' },
+  { pattern: /^\/api\/settings/,       permission: 'settings:write' },
+  { pattern: /^\/api\/providers/,      permission: 'providers:write' },
+  { pattern: /^\/api\/pricing/,        permission: 'settings:write' },
+  { pattern: /^\/api\/plugins/,        permission: 'settings:write' },
+  { pattern: /^\/api\/cache/,          permission: 'settings:write' },
+  { pattern: /^\/api\/provider-nodes/, permission: 'settings:write' },
+  { pattern: /^\/api\/proxy-pools/,    permission: 'settings:write' },
+  { pattern: /^\/api\/keys/,           permission: 'keys:read:own' },
+  { pattern: /^\/api\/usage/,          permission: 'usage:read:own' },
+  { pattern: /^\/api\/combos/,         permission: 'combos:read' },
+  { pattern: /^\/api\/models/,         permission: 'models:read' },
+  { pattern: /^\/api\/templates/,      permission: 'combos:read' },
 ];
 
 /**
