@@ -30,7 +30,7 @@ export async function GET(request) {
     const logs = await getAuditLogs({ action, resource, userId, from, to, limit, offset });
     return NextResponse.json({ logs, limit, offset, count: logs.length });
   } catch (err) {
-    console.log("Error fetching audit logs:", err);
+    console.error("Error fetching audit logs:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

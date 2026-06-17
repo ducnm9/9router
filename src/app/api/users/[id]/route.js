@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
     const { oidcSub, ...safe } = user;
     return NextResponse.json(safe);
   } catch (err) {
-    console.log("Error fetching user:", err);
+    console.error("Error fetching user:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -72,7 +72,7 @@ export async function PUT(request, { params }) {
     const { oidcSub, ...safe } = updated;
     return NextResponse.json(safe);
   } catch (err) {
-    console.log("Error updating user:", err);
+    console.error("Error updating user:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -109,7 +109,7 @@ export async function DELETE(request, { params }) {
     });
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.log("Error deleting user:", err);
+    console.error("Error deleting user:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

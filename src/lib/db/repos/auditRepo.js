@@ -36,6 +36,7 @@ export async function logAuditEvent({ userId, action, resource, resourceId, deta
  * Query audit logs with optional filters.
  */
 export async function getAuditLogs({ action, resource, userId, limit = 50, offset = 0, from, to } = {}) {
+  const safeLim = Math.min(Math.max(1, parseInt(limit) || 50), 1000); // cap at 1000
   const db = await getAdapter();
   let sql = 'SELECT * FROM auditLog WHERE 1=1';
   const params = [];
@@ -47,7 +48,7 @@ export async function getAuditLogs({ action, resource, userId, limit = 50, offse
   if (to) { sql += ' AND timestamp <= ?'; params.push(to); }
 
   sql += ' ORDER BY timestamp DESC LIMIT ? OFFSET ?';
-  params.push(limit, offset);
+  params.push(safeLim, offset);
 
   const rows = db.all(sql, params);
   return rows.map(row => ({

@@ -21,7 +21,7 @@ export async function GET() {
     }));
     return NextResponse.json(safe);
   } catch (err) {
-    console.log("Error fetching users:", err);
+    console.error("Error fetching users:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
@@ -59,7 +59,7 @@ export async function POST(request) {
     const { oidcSub, ...safe } = user;
     return NextResponse.json(safe, { status: 201 });
   } catch (err) {
-    console.log("Error creating user:", err);
+    console.error("Error creating user:", err);
     if (err.message?.includes("email already exists")) {
       return NextResponse.json({ error: err.message }, { status: 409 });
     }
