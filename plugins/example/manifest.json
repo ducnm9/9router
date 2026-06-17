@@ -1,0 +1,9 @@
+{
+  "id": "example-plugin",
+  "name": "Example Plugin",
+  "version": "1.0.0",
+  "description": "Demonstrates the plugin hook system. Logs request model and provider success.",
+  "main": "index.js",
+  "enabled": false,
+  "hooks": ["request:before", "provider:success"]
+}
