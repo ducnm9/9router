@@ -28,6 +28,63 @@ import { logAuditEvent } from "@/lib/db/repos/auditRepo.js";
 import { getHealthTracker } from "@/lib/providerHealth.js";
 
 /**
+ * Apply routing strategy to combo models.
+ * Returns a reordered copy — never mutates input.
+ */
+function applyRoutingStrategy(comboModels, settings, tracker) {
+  if (!comboModels || comboModels.length < 2) return comboModels;
+  const strategy = settings?.routingStrategy;
+  if (!strategy || strategy === 'priority') return comboModels;
+
+  const scored = comboModels.map((m, idx) => {
+    const provider = m.split('/')[0];
+    const health = tracker.getHealth(provider);
+    return { m, idx, health };
+  });
+
+  if (strategy === 'latency') {
+    return scored.sort((a, b) => {
+      if (a.health.status === 'unhealthy' && b.health.status !== 'unhealthy') return 1;
+      if (b.health.status === 'unhealthy' && a.health.status !== 'unhealthy') return -1;
+      const scoreA = (a.health.successRate ?? 0.5) * (1000 / Math.max(a.health.avgLatencyMs ?? 500, 1));
+      const scoreB = (b.health.successRate ?? 0.5) * (1000 / Math.max(b.health.avgLatencyMs ?? 500, 1));
+      return scoreB - scoreA;
+    }).map(x => x.m);
+  }
+
+  if (strategy === 'balanced') {
+    // Normalize health score to [0,1] using relative rank among providers with data
+    const withData = scored.filter(x => x.health.successRate !== null);
+    const maxScore = withData.length > 0
+      ? Math.max(...withData.map(x => (x.health.successRate ?? 0) * (1000 / Math.max(x.health.avgLatencyMs ?? 500, 1))))
+      : 1;
+
+    return scored.sort((a, b) => {
+      if (a.health.status === 'unhealthy' && b.health.status !== 'unhealthy') return 1;
+      if (b.health.status === 'unhealthy' && a.health.status !== 'unhealthy') return -1;
+
+      const priorityA = 1 / (a.idx + 1);
+      const priorityB = 1 / (b.idx + 1);
+      // Normalize priority to [0,1] based on max (1/1 = 1.0)
+      const maxPriority = 1;
+      const normPriorityA = priorityA / maxPriority;
+      const normPriorityB = priorityB / maxPriority;
+
+      const rawHealthA = (a.health.successRate ?? 0) * (1000 / Math.max(a.health.avgLatencyMs ?? 500, 1));
+      const rawHealthB = (b.health.successRate ?? 0) * (1000 / Math.max(b.health.avgLatencyMs ?? 500, 1));
+      const normHealthA = maxScore > 0 ? rawHealthA / maxScore : 0;
+      const normHealthB = maxScore > 0 ? rawHealthB / maxScore : 0;
+
+      const blendA = 0.6 * normPriorityA + 0.4 * normHealthA;
+      const blendB = 0.6 * normPriorityB + 0.4 * normHealthB;
+      return blendB - blendA;
+    }).map(x => x.m);
+  }
+
+  return comboModels;
+}
+
+/**
  * Handle chat completion request
  * Supports: OpenAI, Claude, Gemini, OpenAI Responses API formats
  * Format detection and translation handled by translator
@@ -239,35 +296,7 @@ export async function handleChat(request, clientRawRequest = null) {
         if (healthy.length > 0) orderedModels = healthy;
       }
 
-      if (settings.routingStrategy && settings.routingStrategy !== 'priority') {
-        if (settings.routingStrategy === 'latency') {
-          orderedModels = [...orderedModels].sort((a, b) => {
-            const healthA = tracker.getHealth(a.split('/')[0]);
-            const healthB = tracker.getHealth(b.split('/')[0]);
-            if (healthA.status === 'unhealthy' && healthB.status !== 'unhealthy') return 1;
-            if (healthB.status === 'unhealthy' && healthA.status !== 'unhealthy') return -1;
-            const scoreA = (healthA.successRate ?? 0.5) * (1000 / Math.max(healthA.avgLatencyMs ?? 500, 1));
-            const scoreB = (healthB.successRate ?? 0.5) * (1000 / Math.max(healthB.avgLatencyMs ?? 500, 1));
-            return scoreB - scoreA;
-          });
-        } else if (settings.routingStrategy === 'balanced') {
-          orderedModels = [...orderedModels].sort((a, b) => {
-            const idxA = comboModels.indexOf(a);
-            const idxB = comboModels.indexOf(b);
-            const healthA = tracker.getHealth(a.split('/')[0]);
-            const healthB = tracker.getHealth(b.split('/')[0]);
-            if (healthA.status === 'unhealthy' && healthB.status !== 'unhealthy') return 1;
-            if (healthB.status === 'unhealthy' && healthA.status !== 'unhealthy') return -1;
-            const priorityScoreA = 1 / (idxA + 1);
-            const priorityScoreB = 1 / (idxB + 1);
-            const healthScoreA = (healthA.successRate ?? 0.5) * (1000 / Math.max(healthA.avgLatencyMs ?? 500, 1));
-            const healthScoreB = (healthB.successRate ?? 0.5) * (1000 / Math.max(healthB.avgLatencyMs ?? 500, 1));
-            const blendA = 0.6 * priorityScoreA + 0.4 * (healthScoreA / 1000);
-            const blendB = 0.6 * priorityScoreB + 0.4 * (healthScoreB / 1000);
-            return blendB - blendA;
-          });
-        }
-      }
+      orderedModels = applyRoutingStrategy(orderedModels, settings, tracker);
     }
 
     log.info("CHAT", `Combo "${modelStr}" with ${orderedModels.length} models (strategy: ${comboStrategy}, routing: ${settings.routingStrategy || 'priority'}, sticky: ${comboStickyLimit})`);
@@ -316,35 +345,7 @@ async function handleSingleModelChat(body, modelStr, clientRawRequest = null, re
           if (healthy.length > 0) orderedModels = healthy;
         }
 
-        if (chatSettings.routingStrategy && chatSettings.routingStrategy !== 'priority') {
-          if (chatSettings.routingStrategy === 'latency') {
-            orderedModels = [...orderedModels].sort((a, b) => {
-              const healthA = tracker.getHealth(a.split('/')[0]);
-              const healthB = tracker.getHealth(b.split('/')[0]);
-              if (healthA.status === 'unhealthy' && healthB.status !== 'unhealthy') return 1;
-              if (healthB.status === 'unhealthy' && healthA.status !== 'unhealthy') return -1;
-              const scoreA = (healthA.successRate ?? 0.5) * (1000 / Math.max(healthA.avgLatencyMs ?? 500, 1));
-              const scoreB = (healthB.successRate ?? 0.5) * (1000 / Math.max(healthB.avgLatencyMs ?? 500, 1));
-              return scoreB - scoreA;
-            });
-          } else if (chatSettings.routingStrategy === 'balanced') {
-            orderedModels = [...orderedModels].sort((a, b) => {
-              const idxA = comboModels.indexOf(a);
-              const idxB = comboModels.indexOf(b);
-              const healthA = tracker.getHealth(a.split('/')[0]);
-              const healthB = tracker.getHealth(b.split('/')[0]);
-              if (healthA.status === 'unhealthy' && healthB.status !== 'unhealthy') return 1;
-              if (healthB.status === 'unhealthy' && healthA.status !== 'unhealthy') return -1;
-              const priorityScoreA = 1 / (idxA + 1);
-              const priorityScoreB = 1 / (idxB + 1);
-              const healthScoreA = (healthA.successRate ?? 0.5) * (1000 / Math.max(healthA.avgLatencyMs ?? 500, 1));
-              const healthScoreB = (healthB.successRate ?? 0.5) * (1000 / Math.max(healthB.avgLatencyMs ?? 500, 1));
-              const blendA = 0.6 * priorityScoreA + 0.4 * (healthScoreA / 1000);
-              const blendB = 0.6 * priorityScoreB + 0.4 * (healthScoreB / 1000);
-              return blendB - blendA;
-            });
-          }
-        }
+        orderedModels = applyRoutingStrategy(orderedModels, chatSettings, tracker);
       }
 
       log.info("CHAT", `Combo "${modelStr}" with ${orderedModels.length} models (strategy: ${comboStrategy}, routing: ${chatSettings.routingStrategy || 'priority'}, sticky: ${comboStickyLimit})`);
