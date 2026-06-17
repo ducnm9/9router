@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { getSettings } from "@/lib/localDb";
+import { verifyDashboardAuthToken } from "@/lib/auth/dashboardSession";
 import { getHealthTracker } from "@/lib/providerHealth.js";
 
 const CORS_HEADERS = {
@@ -8,6 +11,15 @@ const CORS_HEADERS = {
 };
 
 export async function GET(request) {
+  const settings = await getSettings();
+  if (settings.requireLogin !== false) {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("auth_token")?.value;
+    if (!(await verifyDashboardAuthToken(token))) {
+      return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+    }
+  }
+
   const tracker = getHealthTracker();
   const url = new URL(request.url);
   const providerId = url.searchParams.get("provider");
